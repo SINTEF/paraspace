@@ -10,7 +10,7 @@ pub enum SolverError {
     GoalValueDurationLimit,
 }
 
-pub fn solve(problem: &Problem) -> Result<(), SolverError> {
+pub fn solve(problem: &Problem) -> Result<Solution, SolverError> {
     let z3_config = z3::Config::new();
     let ctx = z3::Context::new(&z3_config);
     let solver = z3::Solver::new(&ctx);
@@ -41,7 +41,6 @@ pub fn solve(problem: &Problem) -> Result<(), SolverError> {
 
     for goal in problem.goals.iter() {
         let timeline_idx = timelines_by_name[goal.timeline_name.as_str()];
-        let value_idx = values.len();
         let state = problem.timelines[timeline_idx]
             .states
             .iter()
@@ -56,42 +55,99 @@ pub fn solve(problem: &Problem) -> Result<(), SolverError> {
             timeline_idx,
             start_time: Real::fresh_const(&ctx, "t"),
             value: goal.value.as_str(),
-            end_time :None,
-            condition: None, // unconditional
+            end_time: None,
+            prefix: None, // unconditional
         });
     }
 
-    struct ExpandLinkIdx(usize);
-    let mut expansions: HashMap<Bool, ExpandLinkIdx> = HashMap::new();
+    let mut expand_links: HashMap<Bool, usize> = HashMap::new();
 
     loop {
         // Expand the graph and try to solve
-        while value_link_queue < values.len() {
-            // add all the links for the value
-            let value = &values[value_link_queue];
-            value_link_queue += 1;
+        while value_link_queue < values.len() || link_queue < links.len() {
+            while value_link_queue < values.len() {
+                // add all the links for the value
+                let value = &values[value_link_queue];
 
-            
-            let state = problem.timelines[value.timeline_idx]
-                .states
-                .iter()
-                .find(|s| s.name == value.value)
-                .unwrap();
+                let state = problem.timelines[value.timeline_idx]
+                    .states
+                    .iter()
+                    .find(|s| s.name == value.value)
+                    .unwrap();
 
-            for condition in state.conditions.iter() {
-                match condition {
-                    Condition::UseResource(obj, amount) => {}
-                    Condition::TransitionFrom(prev_value) => {
+                for condition in state.conditions.iter() {
+                    links.push(Link {
+                        value_idx: value_link_queue,
+                        condition,
+                    });
+                }
+
+                value_link_queue += 1;
+            }
+            while link_queue < links.len() {
+                let link = &links[link_queue];
+                let value = &values[link.value_idx];
+
+                match link.condition {
+                    Condition::UseResource(_, _) => todo!(),
+                    Condition::TransitionFrom(prev) => {
+                        let prefix = value.prefix.is_some().then(|| Bool::fresh_const(&ctx, "pre"));
+
+                        let state = problem.timelines[value.timeline_idx]
+                            .states
+                            .iter()
+                            .find(|s| s.name == value.value)
+                            .unwrap();
+
+                        let new_value = Value {
+                            end_time: Some(value.start_time.clone()),
+                            prefix,
+                            start_time: Real::fresh_const(&ctx, "t"),
+                            timeline_idx: value.timeline_idx,
+                            value: prev,
+                        };
+
+                        let new_state = problem.timelines[new_value.timeline_idx]
+                            .states
+                            .iter()
+                            .find(|s| s.name == new_value.value)
+                            .unwrap();
+
+                        solver.assert(&Real::lt(
+                            &Real::add(
+                                &ctx,
+                                &[
+                                    &new_value.start_time,
+                                    &Real::from_real(&ctx, new_state.duration.0 as i32, 1),
+                                ],
+                            ),
+                            &value.start_time,
+                        ));
+                        println!(
+                            "{}.{} {:?}",
+                            problem.timelines[value.timeline_idx].name.as_ref().unwrap(),
+                            new_value.value,
+                            state.duration
+                        );
+
+                        if let Some(max_dur) = new_state.duration.1 {
+                            solver.assert(&Real::gt(
+                                &Real::add(&ctx, &[&new_value.start_time, &Real::from_real(&ctx, max_dur as i32, 1)]),
+                                &value.start_time,
+                            ));
+                        }
+
+                        values.push(new_value);
                     }
-                    Condition::During(tl, v) => {
-                       links.push(0); 
-                    }
-                    Condition::MetBy(tl, v) => todo!(),
+                    Condition::During(_, _) => todo!(),
+                    Condition::MetBy(_, _) => todo!(),
                 };
+
+                link_queue += 1;
             }
         }
 
-        let assumptions = expansions.keys().cloned().collect::<Vec<_>>();
+        let assumptions = expand_links.keys().cloned().collect::<Vec<_>>();
         let result = solver.check_assumptions(&assumptions);
         match result {
             z3::SatResult::Unsat => {
@@ -101,13 +157,42 @@ pub fn solve(problem: &Problem) -> Result<(), SolverError> {
                 }
 
                 for c in core {
-                    let ExpandLinkIdx(link_idx) = expansions.remove(&c).unwrap();
+                    let link_idx = expand_links.remove(&c).unwrap();
                     todo!("Expand link_idx");
                 }
             }
 
             z3::SatResult::Sat => {
-                return Ok(());
+                let model = solver.get_model().unwrap();
+
+                let mut timelines: Vec<SolutionTimeline> = problem
+                    .timelines
+                    .iter()
+                    .enumerate()
+                    .map(|(i, t)| SolutionTimeline {
+                        name: t.name.as_ref().cloned().unwrap_or_else(|| format!("{}_{}", t.class, i)),
+                        class: t.class.clone(),
+                        tokens: Vec::new(),
+                    })
+                    .collect();
+
+                for v in values.iter() {
+                    let start_time = from_z3_real(&model.eval(&v.start_time, true).unwrap());
+                    let end_time = v
+                        .end_time
+                        .as_ref()
+                        .map(|t| from_z3_real(&model.eval(t, true).unwrap()))
+                        .unwrap_or(f32::INFINITY);
+
+                    timelines[v.timeline_idx].tokens.push(Token {
+                        value: v.value.to_string(),
+                        start_time,
+                        end_time,
+                    })
+                }
+
+                println!("SOLUTION {:#?}", timelines);
+                return Ok(Solution { timelines });
             }
 
             z3::SatResult::Unknown => {
@@ -117,39 +202,20 @@ pub fn solve(problem: &Problem) -> Result<(), SolverError> {
     }
 }
 
+fn from_z3_real(real: &Real) -> f32 {
+    let (num, den) = real.as_real().unwrap();
+    num as f32 / den as f32
+}
+
+struct Link<'a> {
+    value_idx: usize,
+    condition: &'a Condition,
+}
+
 struct Value<'a, 'z3> {
-    start_time :Real<'z3>,
-    end_time :Option<Real<'z3>>,
+    start_time: Real<'z3>,
+    end_time: Option<Real<'z3>>,
     timeline_idx: usize,
     value: &'a str,
-    condition: Option<Bool<'z3>>,
+    prefix: Option<Bool<'z3>>,
 }
-
-struct Link {
-    timeline_idx :usize,
-}
-
-// struct ValueGraph<'a> {
-//     timeline: &'a Timeline,
-//     last_value: Option<()>,
-// }
-
-// impl<'a> ValueGraph<'a> {
-//     pub fn new(timeline: &'a Timeline) -> Self {
-//         Self {
-//             timeline,
-//             last_value: None,
-//         }
-//     }
-
-//     pub fn set_last_value(&mut self, value: &'a str) -> Result<(), SolverError> {
-//         if self.last_value.is_some() {
-//             return Err(SolverError::MultipleLastValues {
-//                 timeline: self.timeline.name.as_ref().cloned().unwrap_or_else(String::new),
-//             });
-//         }
-//         self.last_value = Some(());
-
-//         Ok(())
-//     }
-// }

@@ -2,6 +2,32 @@ use serde::{Serialize, Deserialize};
 
 #[derive(Serialize, Deserialize)]
 #[derive(Debug)]
+
+pub struct Solution {
+    pub timelines: Vec<SolutionTimeline>,
+}
+
+#[derive(Serialize, Deserialize)]
+#[derive(Debug)]
+
+pub struct SolutionTimeline {
+    pub name :String,
+    pub class :String,
+    pub tokens: Vec<Token>,
+}
+
+#[derive(Serialize, Deserialize)]
+#[derive(Debug)]
+pub struct Token {
+    pub value :String,
+    pub start_time :f32,
+    pub end_time :f32,
+}
+
+
+#[derive(Serialize, Deserialize)]
+#[derive(Debug)]
+
 pub struct Problem {
     pub resources :Vec<Resource>,
     pub timelines :Vec<Timeline>,

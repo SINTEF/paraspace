@@ -20,8 +20,6 @@ fn main() {
     }
 }
 
-
-
 // Compilation idea:
 //  Detect when two resources can be joined together into one
 //  For example, in carbonara domain, boiling/cooking needs to select a plate,
