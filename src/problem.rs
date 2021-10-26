@@ -51,7 +51,7 @@ pub struct TimelineValue {
 pub struct Resource {
     pub class :String,
     pub name :String,
-    pub capacity :usize,
+    pub capacity :u32,
 }
 
 
@@ -74,7 +74,7 @@ pub struct State {
 #[derive(Serialize, Deserialize)]
 #[derive(Debug)]
 pub enum Condition {
-    UseResource(ObjectRef, usize),
+    UseResource(ObjectRef, u32),
     TransitionFrom(String),
     During(ObjectRef, String),
     MetBy(ObjectRef, String),
@@ -85,6 +85,7 @@ pub enum Condition {
 #[derive(Serialize, Deserialize)]
 #[derive(Debug)]
 #[derive(Clone)]
+#[derive(Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub enum ObjectRef {
     AnyOfClass(String),
     Named(String),

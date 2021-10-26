@@ -9,10 +9,12 @@ fn main() {
 
     println!("Problem:\n{:#?}", problem);
     println!("Solving...");
-    let solution = solver::solve(&problem);
-    match solution {
-        Ok(_) => {
-            println!("Success!")
+    let result = solver::solve(&problem);
+    match result {
+        Ok(solution) => {
+            println!("Success!");
+            std::fs::write("out.json", serde_json::to_string_pretty(&solution).unwrap()).unwrap();
+
         }
         Err(err) => {
             println!("Error: {:#?}", err);

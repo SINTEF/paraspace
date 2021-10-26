@@ -1,0 +1,1004 @@
+{
+  "resources": [
+    {
+      "class": "Plate",
+      "name": "Plate_0",
+      "capacity": 1
+    },
+    {
+      "class": "Plate",
+      "name": "Plate_1",
+      "capacity": 1
+    }
+  ],
+  "timelines": [
+    {
+      "class": "Water",
+      "name": "Water_0",
+      "states": [
+        {
+          "name": "Heating",
+          "duration": [
+            10,
+            10
+          ],
+          "conditions": [
+            {
+              "UseResource": [
+                {
+                  "AnyOfClass": "Plate"
+                },
+                1
+              ]
+            }
+          ]
+        },
+        {
+          "name": "HotWater",
+          "duration": [
+            1,
+            null
+          ],
+          "conditions": [
+            {
+              "TransitionFrom": "Heating"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "class": "Oil",
+      "name": "Oil_1",
+      "states": [
+        {
+          "name": "Heating",
+          "duration": [
+            10,
+            10
+          ],
+          "conditions": [
+            {
+              "UseResource": [
+                {
+                  "AnyOfClass": "Plate"
+                },
+                1
+              ]
+            }
+          ]
+        },
+        {
+          "name": "HotOil",
+          "duration": [
+            1,
+            null
+          ],
+          "conditions": [
+            {
+              "TransitionFrom": "Heating"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "class": "Spaghetti",
+      "name": "spaghetti_0",
+      "states": [
+        {
+          "name": "Cooking",
+          "duration": [
+            5,
+            5
+          ],
+          "conditions": [
+            {
+              "During": [
+                {
+                  "AnyOfClass": "Water"
+                },
+                "HotWater"
+              ]
+            }
+          ]
+        },
+        {
+          "name": "Cooked",
+          "duration": [
+            1,
+            null
+          ],
+          "conditions": [
+            {
+              "TransitionFrom": "Cooking"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "class": "Lardon",
+      "name": "lardon_0",
+      "states": [
+        {
+          "name": "Cooking",
+          "duration": [
+            5,
+            5
+          ],
+          "conditions": [
+            {
+              "During": [
+                {
+                  "AnyOfClass": "Oil"
+                },
+                "HotOil"
+              ]
+            }
+          ]
+        },
+        {
+          "name": "Cooked",
+          "duration": [
+            1,
+            null
+          ],
+          "conditions": [
+            {
+              "TransitionFrom": "Cooking"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "class": "Eggs",
+      "name": "eggs_0",
+      "states": [
+        {
+          "name": "Beating",
+          "duration": [
+            5,
+            5
+          ],
+          "conditions": []
+        },
+        {
+          "name": "Beaten",
+          "duration": [
+            1,
+            null
+          ],
+          "conditions": [
+            {
+              "TransitionFrom": "Beating"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "class": "Carbonara",
+      "name": "carbonara_0",
+      "states": [
+        {
+          "name": "Cooking",
+          "duration": [
+            3,
+            3
+          ],
+          "conditions": [
+            {
+              "MetBy": [
+                {
+                  "Named": "spaghetti_0"
+                },
+                "Cooked"
+              ]
+            },
+            {
+              "MetBy": [
+                {
+                  "Named": "lardon_0"
+                },
+                "Cooked"
+              ]
+            },
+            {
+              "MetBy": [
+                {
+                  "Named": "eggs_0"
+                },
+                "Beaten"
+              ]
+            },
+            {
+              "UseResource": [
+                {
+                  "AnyOfClass": "Plate"
+                },
+                1
+              ]
+            }
+          ]
+        },
+        {
+          "name": "Cooked",
+          "duration": [
+            1,
+            null
+          ],
+          "conditions": [
+            {
+              "TransitionFrom": "Cooking"
+            }
+          ]
+        },
+        {
+          "name": "Eating",
+          "duration": [
+            5,
+            5
+          ],
+          "conditions": [
+            {
+              "TransitionFrom": "Cooked"
+            }
+          ]
+        },
+        {
+          "name": "Eaten",
+          "duration": [
+            1,
+            null
+          ],
+          "conditions": [
+            {
+              "TransitionFrom": "Eating"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "class": "Spaghetti",
+      "name": "spaghetti_1",
+      "states": [
+        {
+          "name": "Cooking",
+          "duration": [
+            5,
+            5
+          ],
+          "conditions": [
+            {
+              "During": [
+                {
+                  "AnyOfClass": "Water"
+                },
+                "HotWater"
+              ]
+            }
+          ]
+        },
+        {
+          "name": "Cooked",
+          "duration": [
+            1,
+            null
+          ],
+          "conditions": [
+            {
+              "TransitionFrom": "Cooking"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "class": "Lardon",
+      "name": "lardon_1",
+      "states": [
+        {
+          "name": "Cooking",
+          "duration": [
+            5,
+            5
+          ],
+          "conditions": [
+            {
+              "During": [
+                {
+                  "AnyOfClass": "Oil"
+                },
+                "HotOil"
+              ]
+            }
+          ]
+        },
+        {
+          "name": "Cooked",
+          "duration": [
+            1,
+            null
+          ],
+          "conditions": [
+            {
+              "TransitionFrom": "Cooking"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "class": "Eggs",
+      "name": "eggs_1",
+      "states": [
+        {
+          "name": "Beating",
+          "duration": [
+            5,
+            5
+          ],
+          "conditions": []
+        },
+        {
+          "name": "Beaten",
+          "duration": [
+            1,
+            null
+          ],
+          "conditions": [
+            {
+              "TransitionFrom": "Beating"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "class": "Carbonara",
+      "name": "carbonara_1",
+      "states": [
+        {
+          "name": "Cooking",
+          "duration": [
+            3,
+            3
+          ],
+          "conditions": [
+            {
+              "MetBy": [
+                {
+                  "Named": "spaghetti_1"
+                },
+                "Cooked"
+              ]
+            },
+            {
+              "MetBy": [
+                {
+                  "Named": "lardon_1"
+                },
+                "Cooked"
+              ]
+            },
+            {
+              "MetBy": [
+                {
+                  "Named": "eggs_1"
+                },
+                "Beaten"
+              ]
+            },
+            {
+              "UseResource": [
+                {
+                  "AnyOfClass": "Plate"
+                },
+                1
+              ]
+            }
+          ]
+        },
+        {
+          "name": "Cooked",
+          "duration": [
+            1,
+            null
+          ],
+          "conditions": [
+            {
+              "TransitionFrom": "Cooking"
+            }
+          ]
+        },
+        {
+          "name": "Eating",
+          "duration": [
+            5,
+            5
+          ],
+          "conditions": [
+            {
+              "TransitionFrom": "Cooked"
+            }
+          ]
+        },
+        {
+          "name": "Eaten",
+          "duration": [
+            1,
+            null
+          ],
+          "conditions": [
+            {
+              "TransitionFrom": "Eating"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "class": "Spaghetti",
+      "name": "spaghetti_2",
+      "states": [
+        {
+          "name": "Cooking",
+          "duration": [
+            5,
+            5
+          ],
+          "conditions": [
+            {
+              "During": [
+                {
+                  "AnyOfClass": "Water"
+                },
+                "HotWater"
+              ]
+            }
+          ]
+        },
+        {
+          "name": "Cooked",
+          "duration": [
+            1,
+            null
+          ],
+          "conditions": [
+            {
+              "TransitionFrom": "Cooking"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "class": "Lardon",
+      "name": "lardon_2",
+      "states": [
+        {
+          "name": "Cooking",
+          "duration": [
+            5,
+            5
+          ],
+          "conditions": [
+            {
+              "During": [
+                {
+                  "AnyOfClass": "Oil"
+                },
+                "HotOil"
+              ]
+            }
+          ]
+        },
+        {
+          "name": "Cooked",
+          "duration": [
+            1,
+            null
+          ],
+          "conditions": [
+            {
+              "TransitionFrom": "Cooking"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "class": "Eggs",
+      "name": "eggs_2",
+      "states": [
+        {
+          "name": "Beating",
+          "duration": [
+            5,
+            5
+          ],
+          "conditions": []
+        },
+        {
+          "name": "Beaten",
+          "duration": [
+            1,
+            null
+          ],
+          "conditions": [
+            {
+              "TransitionFrom": "Beating"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "class": "Carbonara",
+      "name": "carbonara_2",
+      "states": [
+        {
+          "name": "Cooking",
+          "duration": [
+            3,
+            3
+          ],
+          "conditions": [
+            {
+              "MetBy": [
+                {
+                  "Named": "spaghetti_2"
+                },
+                "Cooked"
+              ]
+            },
+            {
+              "MetBy": [
+                {
+                  "Named": "lardon_2"
+                },
+                "Cooked"
+              ]
+            },
+            {
+              "MetBy": [
+                {
+                  "Named": "eggs_2"
+                },
+                "Beaten"
+              ]
+            },
+            {
+              "UseResource": [
+                {
+                  "AnyOfClass": "Plate"
+                },
+                1
+              ]
+            }
+          ]
+        },
+        {
+          "name": "Cooked",
+          "duration": [
+            1,
+            null
+          ],
+          "conditions": [
+            {
+              "TransitionFrom": "Cooking"
+            }
+          ]
+        },
+        {
+          "name": "Eating",
+          "duration": [
+            5,
+            5
+          ],
+          "conditions": [
+            {
+              "TransitionFrom": "Cooked"
+            }
+          ]
+        },
+        {
+          "name": "Eaten",
+          "duration": [
+            1,
+            null
+          ],
+          "conditions": [
+            {
+              "TransitionFrom": "Eating"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "class": "Spaghetti",
+      "name": "spaghetti_3",
+      "states": [
+        {
+          "name": "Cooking",
+          "duration": [
+            5,
+            5
+          ],
+          "conditions": [
+            {
+              "During": [
+                {
+                  "AnyOfClass": "Water"
+                },
+                "HotWater"
+              ]
+            }
+          ]
+        },
+        {
+          "name": "Cooked",
+          "duration": [
+            1,
+            null
+          ],
+          "conditions": [
+            {
+              "TransitionFrom": "Cooking"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "class": "Lardon",
+      "name": "lardon_3",
+      "states": [
+        {
+          "name": "Cooking",
+          "duration": [
+            5,
+            5
+          ],
+          "conditions": [
+            {
+              "During": [
+                {
+                  "AnyOfClass": "Oil"
+                },
+                "HotOil"
+              ]
+            }
+          ]
+        },
+        {
+          "name": "Cooked",
+          "duration": [
+            1,
+            null
+          ],
+          "conditions": [
+            {
+              "TransitionFrom": "Cooking"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "class": "Eggs",
+      "name": "eggs_3",
+      "states": [
+        {
+          "name": "Beating",
+          "duration": [
+            5,
+            5
+          ],
+          "conditions": []
+        },
+        {
+          "name": "Beaten",
+          "duration": [
+            1,
+            null
+          ],
+          "conditions": [
+            {
+              "TransitionFrom": "Beating"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "class": "Carbonara",
+      "name": "carbonara_3",
+      "states": [
+        {
+          "name": "Cooking",
+          "duration": [
+            3,
+            3
+          ],
+          "conditions": [
+            {
+              "MetBy": [
+                {
+                  "Named": "spaghetti_3"
+                },
+                "Cooked"
+              ]
+            },
+            {
+              "MetBy": [
+                {
+                  "Named": "lardon_3"
+                },
+                "Cooked"
+              ]
+            },
+            {
+              "MetBy": [
+                {
+                  "Named": "eggs_3"
+                },
+                "Beaten"
+              ]
+            },
+            {
+              "UseResource": [
+                {
+                  "AnyOfClass": "Plate"
+                },
+                1
+              ]
+            }
+          ]
+        },
+        {
+          "name": "Cooked",
+          "duration": [
+            1,
+            null
+          ],
+          "conditions": [
+            {
+              "TransitionFrom": "Cooking"
+            }
+          ]
+        },
+        {
+          "name": "Eating",
+          "duration": [
+            5,
+            5
+          ],
+          "conditions": [
+            {
+              "TransitionFrom": "Cooked"
+            }
+          ]
+        },
+        {
+          "name": "Eaten",
+          "duration": [
+            1,
+            null
+          ],
+          "conditions": [
+            {
+              "TransitionFrom": "Eating"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "class": "Spaghetti",
+      "name": "spaghetti_4",
+      "states": [
+        {
+          "name": "Cooking",
+          "duration": [
+            5,
+            5
+          ],
+          "conditions": [
+            {
+              "During": [
+                {
+                  "AnyOfClass": "Water"
+                },
+                "HotWater"
+              ]
+            }
+          ]
+        },
+        {
+          "name": "Cooked",
+          "duration": [
+            1,
+            null
+          ],
+          "conditions": [
+            {
+              "TransitionFrom": "Cooking"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "class": "Lardon",
+      "name": "lardon_4",
+      "states": [
+        {
+          "name": "Cooking",
+          "duration": [
+            5,
+            5
+          ],
+          "conditions": [
+            {
+              "During": [
+                {
+                  "AnyOfClass": "Oil"
+                },
+                "HotOil"
+              ]
+            }
+          ]
+        },
+        {
+          "name": "Cooked",
+          "duration": [
+            1,
+            null
+          ],
+          "conditions": [
+            {
+              "TransitionFrom": "Cooking"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "class": "Eggs",
+      "name": "eggs_4",
+      "states": [
+        {
+          "name": "Beating",
+          "duration": [
+            5,
+            5
+          ],
+          "conditions": []
+        },
+        {
+          "name": "Beaten",
+          "duration": [
+            1,
+            null
+          ],
+          "conditions": [
+            {
+              "TransitionFrom": "Beating"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "class": "Carbonara",
+      "name": "carbonara_4",
+      "states": [
+        {
+          "name": "Cooking",
+          "duration": [
+            3,
+            3
+          ],
+          "conditions": [
+            {
+              "MetBy": [
+                {
+                  "Named": "spaghetti_4"
+                },
+                "Cooked"
+              ]
+            },
+            {
+              "MetBy": [
+                {
+                  "Named": "lardon_4"
+                },
+                "Cooked"
+              ]
+            },
+            {
+              "MetBy": [
+                {
+                  "Named": "eggs_4"
+                },
+                "Beaten"
+              ]
+            },
+            {
+              "UseResource": [
+                {
+                  "AnyOfClass": "Plate"
+                },
+                1
+              ]
+            }
+          ]
+        },
+        {
+          "name": "Cooked",
+          "duration": [
+            1,
+            null
+          ],
+          "conditions": [
+            {
+              "TransitionFrom": "Cooking"
+            }
+          ]
+        },
+        {
+          "name": "Eating",
+          "duration": [
+            5,
+            5
+          ],
+          "conditions": [
+            {
+              "TransitionFrom": "Cooked"
+            }
+          ]
+        },
+        {
+          "name": "Eaten",
+          "duration": [
+            1,
+            null
+          ],
+          "conditions": [
+            {
+              "TransitionFrom": "Eating"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "facts": [],
+  "goals": [
+    {
+      "timeline_name": "carbonara_0",
+      "value": "Eaten"
+    },
+    {
+      "timeline_name": "carbonara_1",
+      "value": "Eaten"
+    },
+    {
+      "timeline_name": "carbonara_2",
+      "value": "Eaten"
+    },
+    {
+      "timeline_name": "carbonara_3",
+      "value": "Eaten"
+    },
+    {
+      "timeline_name": "carbonara_4",
+      "value": "Eaten"
+    }
+  ]
+}

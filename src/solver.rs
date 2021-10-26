@@ -7,11 +7,12 @@ use std::collections::HashMap;
 #[derive(Clone, Debug)]
 pub enum SolverError {
     NoSolution,
+    UnsupportedInput,
     GoalValueDurationLimit,
 }
 
 pub enum LinkCondition<'a> {
-    Resource(&'a ObjectRef, usize),
+    Resource(&'a ObjectRef, u32),
     Temporal(TemporalType, Result<&'a ObjectRef, &'a str>, &'a str),
 }
 
@@ -43,7 +44,7 @@ pub fn solve(problem: &Problem) -> Result<Solution, SolverError> {
         .map(|(i, t)| (t.name.as_str(), i))
         .collect::<HashMap<_, _>>();
 
-    let _resoures_by_name = problem
+    let resources_by_name = problem
         .resources
         .iter()
         .enumerate()
@@ -59,6 +60,7 @@ pub fn solve(problem: &Problem) -> Result<Solution, SolverError> {
     let mut token_queue = 0;
     let mut links = Vec::new();
     let mut link_queue = 0;
+    let mut resource_constraints: HashMap<&ObjectRef, ResourceConstraint> = Default::default();
     let mut values_by_name: HashMap<(&str, &str), Vec<usize>> = HashMap::new();
 
     for goal in problem.goals.iter() {
@@ -168,9 +170,12 @@ pub fn solve(problem: &Problem) -> Result<Solution, SolverError> {
 
                 // println!("Expanding link for {}", token.value);
                 match convert_condition(timeline_name, link.condition) {
-                    LinkCondition::Resource(_, _) => {
-
-                        // TODO: implement resources
+                    LinkCondition::Resource(obj, amount) => {
+                        resource_constraints
+                            .entry(obj)
+                            .or_default()
+                            .users
+                            .push((link.token_idx, amount));
                     }
 
                     LinkCondition::Temporal(temporal_relationship_type, objref, target_value) => {
@@ -294,6 +299,69 @@ pub fn solve(problem: &Problem) -> Result<Solution, SolverError> {
             }
         }
 
+        // Need to check all the resource constraints to see if they need to be "integrated".
+        // The resource constraints cannot generate new tokens or links, so this can be done in a separate non-loop here.
+        for (obj, rc) in resource_constraints.iter() {
+            // We don't yet support name-based and class-based resource references at the same time,
+            // so check that the spec doesn't do that.
+            if let ObjectRef::Named(name) = obj {
+                let timeline = &problem.timelines[timelines_by_name[name.as_str()]];
+                if resource_constraints
+                    .iter()
+                    .any(|(other_objref, _)| *other_objref == &ObjectRef::AnyOfClass(timeline.class.clone()))
+                {
+                    return Err(SolverError::UnsupportedInput);
+                }
+            }
+
+            if rc.users.len() > rc.integrated {
+                // We need to update the constraint.
+
+                if !rc.closed {
+                    // TODO: make an extension point in the pseudo-boolean constraint for adding more usages later.
+                }
+
+                let capacity = match obj {
+                    ObjectRef::AnyOfClass(c) => problem
+                        .resources
+                        .iter()
+                        .filter_map(|r| (&r.class == c).then(|| r.capacity))
+                        .sum::<u32>(),
+                    ObjectRef::Named(n) => problem.resources[resources_by_name[n.as_str()]].capacity,
+                };
+
+                // TASK-INDEXED RESOURCE CONSTRAINT
+                for (token1, _) in rc.users.iter() {
+                    let overlaps = rc
+                        .users
+                        .iter()
+                        .map(|(token2, amount2)| {
+                            let overlap = Bool::and(
+                                &ctx,
+                                &[
+                                    &tokens[*token1].active,
+                                    &tokens[*token2].active,
+                                    &Real::lt(
+                                        tokens[*token1].start_time.as_ref().unwrap(),
+                                        tokens[*token2].end_time.as_ref().unwrap(),
+                                    ),
+                                    &Real::lt(
+                                        tokens[*token2].start_time.as_ref().unwrap(),
+                                        tokens[*token1].end_time.as_ref().unwrap(),
+                                    ),
+                                ],
+                            );
+
+                            (overlap, *amount2)
+                        })
+                        .collect::<Vec<_>>();
+
+                    let overlaps_refs = overlaps.iter().map(|(o, c)| (o, *c as i32)).collect::<Vec<_>>();
+                    solver.assert(&Bool::pb_le(&ctx, &overlaps_refs, capacity as i32));
+                }
+            }
+        }
+
         let assumptions = expand_links.keys().map(|k| Bool::not(k)).collect::<Vec<_>>();
         println!("{}", solver);
         println!(
@@ -382,4 +450,11 @@ struct Token<'a, 'z3> {
 enum FixedValueType {
     Goal,
     Fact,
+}
+
+#[derive(Default)]
+struct ResourceConstraint {
+    users: Vec<(usize, u32)>,
+    integrated: usize,
+    closed: bool,
 }
