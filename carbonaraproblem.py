@@ -1,7 +1,7 @@
 from problemdsl import *
 import json
 
-n = 5
+n = 1
 p = Problem()
 
 

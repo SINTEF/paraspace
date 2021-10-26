@@ -13,12 +13,12 @@ pub struct Solution {
 pub struct SolutionTimeline {
     pub name :String,
     pub class :String,
-    pub tokens: Vec<Token>,
+    pub tokens: Vec<SolutionToken>,
 }
 
 #[derive(Serialize, Deserialize)]
 #[derive(Debug)]
-pub struct Token {
+pub struct SolutionToken {
     pub value :String,
     pub start_time :f32,
     pub end_time :f32,
@@ -50,7 +50,7 @@ pub struct TimelineValue {
 #[derive(Debug)]
 pub struct Resource {
     pub class :String,
-    pub name :Option<String>,
+    pub name :String,
     pub capacity :usize,
 }
 
@@ -59,7 +59,7 @@ pub struct Resource {
 #[derive(Debug)]
 pub struct Timeline {
     pub class :String,
-    pub name :Option<String>,
+    pub name :String,
     pub states :Vec<State>,
 }
 
@@ -84,6 +84,7 @@ pub enum Condition {
 /// either any object of a given class or a specific object by name.
 #[derive(Serialize, Deserialize)]
 #[derive(Debug)]
+#[derive(Clone)]
 pub enum ObjectRef {
     AnyOfClass(String),
     Named(String),

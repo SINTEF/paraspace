@@ -1,13 +1,32 @@
+use z3::ast::Ast;
 use z3::ast::{Bool, Real};
 
-use crate::problem::*;
-use std::{collections::HashMap, hash::Hash};
+use crate::{multiplicity::multiplicity_one, problem::*};
+use std::collections::HashMap;
 
 #[derive(Clone, Debug)]
 pub enum SolverError {
     NoSolution,
-    MultipleLastValues { timeline: String },
     GoalValueDurationLimit,
+}
+
+pub enum LinkCondition<'a> {
+    Resource(&'a ObjectRef, usize),
+    Temporal(TemporalType, Result<&'a ObjectRef, &'a str>, &'a str),
+}
+
+pub fn convert_condition<'a>(this: &'a str, cond: &'a Condition) -> LinkCondition<'a> {
+    match cond {
+        Condition::UseResource(o, a) => LinkCondition::Resource(o, *a),
+        Condition::TransitionFrom(v) => LinkCondition::Temporal(TemporalType::Meet, Err(this), v),
+        Condition::During(o, x) => LinkCondition::Temporal(TemporalType::Cover, Ok(o), x),
+        Condition::MetBy(o, x) => LinkCondition::Temporal(TemporalType::Meet, Ok(o), x),
+    }
+}
+
+pub enum TemporalType {
+    Meet,
+    Cover,
 }
 
 pub fn solve(problem: &Problem) -> Result<Solution, SolverError> {
@@ -15,18 +34,20 @@ pub fn solve(problem: &Problem) -> Result<Solution, SolverError> {
     let ctx = z3::Context::new(&z3_config);
     let solver = z3::Solver::new(&ctx);
 
+    let multiplicity_one = multiplicity_one(problem);
+
     let timelines_by_name = problem
         .timelines
         .iter()
         .enumerate()
-        .filter_map(|(i, t)| t.name.as_ref().map(|n| (n.as_str(), i)))
+        .map(|(i, t)| (t.name.as_str(), i))
         .collect::<HashMap<_, _>>();
 
-    let resoures_by_name = problem
+    let _resoures_by_name = problem
         .resources
         .iter()
         .enumerate()
-        .filter_map(|(i, r)| r.name.as_ref().map(|n| (n.as_str(), i)))
+        .map(|(i, r)| (r.name.as_str(), i))
         .collect::<HashMap<_, _>>();
 
     // timelines by class
@@ -34,10 +55,11 @@ pub fn solve(problem: &Problem) -> Result<Solution, SolverError> {
 
     // let mut value_graphs = problem.timelines.iter().map(ValueGraph::new).collect::<Vec<_>>();
 
-    let mut values = Vec::new();
-    let mut value_link_queue = 0;
+    let mut tokens = Vec::new();
+    let mut token_queue = 0;
     let mut links = Vec::new();
     let mut link_queue = 0;
+    let mut values_by_name: HashMap<(&str, &str), Vec<usize>> = HashMap::new();
 
     for goal in problem.goals.iter() {
         let timeline_idx = timelines_by_name[goal.timeline_name.as_str()];
@@ -51,103 +73,235 @@ pub fn solve(problem: &Problem) -> Result<Solution, SolverError> {
             return Err(SolverError::GoalValueDurationLimit);
         }
 
-        values.push(Value {
+        let value_idx = tokens.len();
+        tokens.push(Token {
             timeline_idx,
-            start_time: Real::fresh_const(&ctx, "t"),
+            start_time: Some(Real::fresh_const(&ctx, "t")),
             value: goal.value.as_str(),
             end_time: None,
-            prefix: None, // unconditional
+            active: Bool::from_bool(&ctx, true), // unconditional
+            fixed: Some(FixedValueType::Goal),
         });
+
+        values_by_name
+            .entry((&goal.timeline_name, &goal.value))
+            .or_default()
+            .push(value_idx);
+    }
+
+    for fact in problem.facts.iter() {
+        let value_idx = tokens.len();
+        let timeline_idx = timelines_by_name[fact.timeline_name.as_str()];
+        tokens.push(Token {
+            timeline_idx,
+            start_time: None,
+            value: fact.value.as_str(),
+            end_time: Some(Real::fresh_const(&ctx, "t")),
+            active: Bool::from_bool(&ctx, true), // unconditional
+            fixed: Some(FixedValueType::Fact),
+        });
+
+        values_by_name
+            .entry((&fact.timeline_name, &fact.value))
+            .or_default()
+            .push(value_idx);
     }
 
     let mut expand_links: HashMap<Bool, usize> = HashMap::new();
 
     loop {
         // Expand the graph and try to solve
-        while value_link_queue < values.len() || link_queue < links.len() {
-            while value_link_queue < values.len() {
+        while token_queue < tokens.len() || link_queue < links.len() {
+            while token_queue < tokens.len() {
                 // add all the links for the value
-                let value = &values[value_link_queue];
+                let token_idx = token_queue;
+                let token = &tokens[token_idx];
+                token_queue += 1;
 
-                let state = problem.timelines[value.timeline_idx]
-                    .states
-                    .iter()
-                    .find(|s| s.name == value.value)
-                    .unwrap();
+                // println!("Expanding graph for {}", token.value);
 
-                for condition in state.conditions.iter() {
-                    links.push(Link {
-                        value_idx: value_link_queue,
-                        condition,
-                    });
-                }
+                // Facts don't need causal links.
+                if !matches!(token.fixed, Some(FixedValueType::Fact)) {
+                    if let Some(state) = problem.timelines[token.timeline_idx]
+                        .states
+                        .iter()
+                        .find(|s| s.name == token.value)
+                    {
+                        if let Some(end_time) = token.end_time.as_ref() {
+                            if let Some(start_time) = token.start_time.as_ref() {
+                                solver.assert(&Real::le(
+                                    &Real::add(&ctx, &[start_time, &Real::from_real(&ctx, state.duration.0 as i32, 1)]),
+                                    end_time,
+                                ));
+                                // println!(
+                                //     "TOKEN {}.{} {:?}",
+                                //     problem.timelines[token.timeline_idx].name, token.value, state.duration
+                                // );
 
-                value_link_queue += 1;
-            }
-            while link_queue < links.len() {
-                let link = &links[link_queue];
-                let value = &values[link.value_idx];
-
-                match link.condition {
-                    Condition::UseResource(_, _) => todo!(),
-                    Condition::TransitionFrom(prev) => {
-                        let prefix = value.prefix.is_some().then(|| Bool::fresh_const(&ctx, "pre"));
-
-                        let state = problem.timelines[value.timeline_idx]
-                            .states
-                            .iter()
-                            .find(|s| s.name == value.value)
-                            .unwrap();
-
-                        let new_value = Value {
-                            end_time: Some(value.start_time.clone()),
-                            prefix,
-                            start_time: Real::fresh_const(&ctx, "t"),
-                            timeline_idx: value.timeline_idx,
-                            value: prev,
-                        };
-
-                        let new_state = problem.timelines[new_value.timeline_idx]
-                            .states
-                            .iter()
-                            .find(|s| s.name == new_value.value)
-                            .unwrap();
-
-                        solver.assert(&Real::lt(
-                            &Real::add(
-                                &ctx,
-                                &[
-                                    &new_value.start_time,
-                                    &Real::from_real(&ctx, new_state.duration.0 as i32, 1),
-                                ],
-                            ),
-                            &value.start_time,
-                        ));
-                        println!(
-                            "{}.{} {:?}",
-                            problem.timelines[value.timeline_idx].name.as_ref().unwrap(),
-                            new_value.value,
-                            state.duration
-                        );
-
-                        if let Some(max_dur) = new_state.duration.1 {
-                            solver.assert(&Real::gt(
-                                &Real::add(&ctx, &[&new_value.start_time, &Real::from_real(&ctx, max_dur as i32, 1)]),
-                                &value.start_time,
-                            ));
+                                if let Some(max_dur) = state.duration.1 {
+                                    solver.assert(&Real::ge(
+                                        &Real::add(&ctx, &[start_time, &Real::from_real(&ctx, max_dur as i32, 1)]),
+                                        end_time,
+                                    ));
+                                }
+                            }
                         }
 
-                        values.push(new_value);
+                        for condition in state.conditions.iter() {
+                            links.push(Link { token_idx, condition });
+                        }
+                    } else {
+                        // This state doesn't exist.
+                        let disable = Bool::not(&token.active);
+                        println!("This state doesn't exist. Asserting {:?}", disable);
+                        solver.assert(&disable);
                     }
-                    Condition::During(_, _) => todo!(),
-                    Condition::MetBy(_, _) => todo!(),
-                };
-
+                }
+            }
+            while link_queue < links.len() {
+                let link_idx = link_queue;
                 link_queue += 1;
+
+                let link = &links[link_idx];
+                let token = &tokens[link.token_idx];
+                let timeline_name = problem.timelines[token.timeline_idx].name.as_str();
+
+                // println!("Expanding link for {}", token.value);
+                match convert_condition(timeline_name, link.condition) {
+                    LinkCondition::Resource(_, _) => {
+
+                        // TODO: implement resources
+                    }
+
+                    LinkCondition::Temporal(temporal_relationship_type, objref, target_value) => {
+                        // All eligible objects for linking to.
+                        let objects: Vec<&str> = match &objref {
+                            Ok(ObjectRef::AnyOfClass(c)) => problem
+                                .timelines
+                                .iter()
+                                .filter_map(|t| (&t.class == c).then(|| t.name.as_str()))
+                                .collect(),
+                            Ok(ObjectRef::Named(n)) => {
+                                vec![n.as_str()]
+                            }
+                            Err(n) => {
+                                vec![n]
+                            }
+                        };
+
+                        let mut alternatives = Vec::new();
+
+                        let mut candidate_tokens = Vec::new();
+                        for obj in objects.iter() {
+                            if let Some(token_ref_list) = values_by_name.get(&(obj, target_value)) {
+                                candidate_tokens.extend(token_ref_list.iter().copied());
+                            }
+                        }
+
+                        let total_multiplicity = objects
+                            .iter()
+                            .map(|o| {
+                                if multiplicity_one.contains(&(o, target_value)) {
+                                    1
+                                } else {
+                                    2
+                                }
+                            })
+                            .sum::<usize>();
+
+                        if total_multiplicity >= 2 {
+                            let expand_lit = Bool::fresh_const(&ctx, "exp");
+                            expand_links.insert(expand_lit.clone(), link_idx);
+                            alternatives.push(expand_lit);
+                        } else {
+                            // println!(
+                            //     "NO MORE ALTERNATIVES FOR {} {}",
+                            //     problem.timelines[token.timeline_idx].name, token.value
+                            // );
+                        }
+
+                        if candidate_tokens.is_empty() {
+                            // Select a object at random
+                            // TODO make a heuristic for this
+
+                            if let Some(obj_name) = objects.get(0) {
+                                let new_token_idx = tokens.len();
+                                //     let token_active = ;
+
+                                tokens.push(Token {
+                                    timeline_idx: timelines_by_name[obj_name],
+                                    active: Bool::fresh_const(&ctx, "pre"),
+                                    fixed: None,
+                                    value: target_value,
+                                    start_time: Some(Real::fresh_const(&ctx, "t")),
+                                    end_time: Some(Real::fresh_const(&ctx, "t")),
+                                });
+
+                                candidate_tokens.push(new_token_idx);
+                                values_by_name
+                                    .entry((obj_name, target_value))
+                                    .or_default()
+                                    .push(new_token_idx);
+                            }
+                        }
+                        let token = &tokens[link.token_idx];
+
+                        for token_idx in candidate_tokens.iter().copied() {
+                            // println!("linking value {} {}", value_idx, link.token_idx);
+
+                            let temporal_rel = match temporal_relationship_type {
+                                TemporalType::Meet => vec![Real::_eq(
+                                    tokens[token_idx].end_time.as_ref().unwrap(),
+                                    token.start_time.as_ref().unwrap(),
+                                )],
+                                TemporalType::Cover => vec![
+                                    Real::le(
+                                        tokens[token_idx].start_time.as_ref().unwrap(),
+                                        token.start_time.as_ref().unwrap(),
+                                    ),
+                                    Real::le(
+                                        token.end_time.as_ref().unwrap(),
+                                        tokens[token_idx].end_time.as_ref().unwrap(),
+                                    ),
+                                ],
+                            };
+
+                            let mut conjunction = temporal_rel;
+                            conjunction.push(tokens[token_idx].active.clone());
+                            let conjunction_ref = conjunction.iter().collect::<Vec<_>>();
+
+                            alternatives.push(Bool::and(&ctx, &conjunction_ref));
+                        }
+
+                        let alternatives_refs = alternatives.iter().collect::<Vec<_>>();
+
+                        let cond = if alternatives_refs.len() == 1 {
+                            alternatives[0].clone()
+                        } else {
+                            Bool::or(&ctx, &alternatives_refs)
+                        };
+
+                        // println!(
+                        //     "TOKEN LINKS for {}.{}[{}] has {} alternatives",
+                        //     problem.timelines[tokens[link.token_idx].timeline_idx].name,
+                        //     tokens[link.token_idx].value,
+                        //     link.token_idx,
+                        //     alternatives.len()
+                        // );
+                        solver.assert(&Bool::implies(&tokens[link.token_idx].active, &cond));
+                    }
+                };
             }
         }
 
-        let assumptions = expand_links.keys().cloned().collect::<Vec<_>>();
+        let assumptions = expand_links.keys().map(|k| Bool::not(k)).collect::<Vec<_>>();
+        println!("{}", solver);
+        println!(
+            "Solving with {} tokens {} causal links {} extension points",
+            tokens.len(),
+            links.len(),
+            assumptions.len()
+        );
         let result = solver.check_assumptions(&assumptions);
         match result {
             z3::SatResult::Unsat => {
@@ -157,7 +311,7 @@ pub fn solve(problem: &Problem) -> Result<Solution, SolverError> {
                 }
 
                 for c in core {
-                    let link_idx = expand_links.remove(&c).unwrap();
+                    let _link_idx = expand_links.remove(&c).unwrap();
                     todo!("Expand link_idx");
                 }
             }
@@ -168,23 +322,26 @@ pub fn solve(problem: &Problem) -> Result<Solution, SolverError> {
                 let mut timelines: Vec<SolutionTimeline> = problem
                     .timelines
                     .iter()
-                    .enumerate()
-                    .map(|(i, t)| SolutionTimeline {
-                        name: t.name.as_ref().cloned().unwrap_or_else(|| format!("{}_{}", t.class, i)),
+                    .map(|t| SolutionTimeline {
+                        name: t.name.clone(),
                         class: t.class.clone(),
                         tokens: Vec::new(),
                     })
                     .collect();
 
-                for v in values.iter() {
-                    let start_time = from_z3_real(&model.eval(&v.start_time, true).unwrap());
+                for v in tokens.iter() {
+                    let start_time = v
+                        .start_time
+                        .as_ref()
+                        .map(|t| from_z3_real(&model.eval(t, true).unwrap()))
+                        .unwrap_or(f32::NEG_INFINITY);
                     let end_time = v
                         .end_time
                         .as_ref()
                         .map(|t| from_z3_real(&model.eval(t, true).unwrap()))
                         .unwrap_or(f32::INFINITY);
 
-                    timelines[v.timeline_idx].tokens.push(Token {
+                    timelines[v.timeline_idx].tokens.push(SolutionToken {
                         value: v.value.to_string(),
                         start_time,
                         end_time,
@@ -192,6 +349,7 @@ pub fn solve(problem: &Problem) -> Result<Solution, SolverError> {
                 }
 
                 println!("SOLUTION {:#?}", timelines);
+
                 return Ok(Solution { timelines });
             }
 
@@ -208,14 +366,20 @@ fn from_z3_real(real: &Real) -> f32 {
 }
 
 struct Link<'a> {
-    value_idx: usize,
+    token_idx: usize,
     condition: &'a Condition,
 }
 
-struct Value<'a, 'z3> {
-    start_time: Real<'z3>,
+struct Token<'a, 'z3> {
+    start_time: Option<Real<'z3>>,
     end_time: Option<Real<'z3>>,
     timeline_idx: usize,
     value: &'a str,
-    prefix: Option<Bool<'z3>>,
+    active: Bool<'z3>,
+    fixed: Option<FixedValueType>,
+}
+
+enum FixedValueType {
+    Goal,
+    Fact,
 }

@@ -1,13 +1,12 @@
 use timelinemodel::{problem::*, solver::solve};
 
-// e2e simple models
 #[test]
-pub fn transitionfrom() {
+pub fn transitions_1() {
     let problem = Problem {
         resources: vec![],
         timelines: vec![Timeline {
             class: "class".to_string(),
-            name: Some("obj".to_string()),
+            name: "obj".to_string(),
             states: vec![
                 State {
                     name: "s1".to_string(),
@@ -19,11 +18,16 @@ pub fn transitionfrom() {
                     conditions: vec![Condition::TransitionFrom("s1".to_string())],
                     duration: (1, None),
                 },
+                State {
+                    name: "s3".to_string(),
+                    conditions: vec![Condition::TransitionFrom("s2".to_string())],
+                    duration: (1, None),
+                },
             ],
         }],
         facts: Vec::new(),
         goals: vec![
-            TimelineValue { timeline_name: "obj".to_string(), value: "s2".to_string() }
+            TimelineValue { timeline_name: "obj".to_string(), value: "s3".to_string() }
         ]
     };
 
@@ -33,13 +37,18 @@ pub fn transitionfrom() {
     let timeline = &solution.timelines[0];
     assert!(timeline.name == "obj");
     assert!(timeline.class == "class");
-    assert!(timeline.tokens.len() == 2);
+    assert!(timeline.tokens.len() == 3);
+
+    let token0 = &timeline.tokens[2];
     let token1 = &timeline.tokens[1];
     let token2 = &timeline.tokens[0];
-    assert!(token1.value == "s1");
-    assert!(token2.value == "s2");
-    assert!(token1.end_time - token1.start_time >= 5. && token1.end_time - token1.start_time <= 6.);
+
+    assert!(token0.value == "s1");
+    assert!(token1.value == "s2");
+    assert!(token2.value == "s3");
+    assert!(token0.end_time - token0.start_time >= 5. && token0.end_time - token0.start_time <= 6.);
     assert!((token1.end_time - token2.start_time).abs() < 1e-5);
+    assert!((token0.end_time - token1.start_time).abs() < 1e-5);
     assert!(token2.end_time.is_infinite());
 
 }

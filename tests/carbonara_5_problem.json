@@ -2,19 +2,19 @@
   "resources": [
     {
       "class": "Plate",
-      "name": null,
+      "name": "Plate_0",
       "capacity": 1
     },
     {
       "class": "Plate",
-      "name": null,
+      "name": "Plate_1",
       "capacity": 1
     }
   ],
   "timelines": [
     {
       "class": "Water",
-      "name": null,
+      "name": "Water_0",
       "states": [
         {
           "name": "Heating",
@@ -49,7 +49,7 @@
     },
     {
       "class": "Oil",
-      "name": null,
+      "name": "Oil_1",
       "states": [
         {
           "name": "Heating",

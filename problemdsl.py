@@ -9,7 +9,7 @@ class Problem():
 
     def resource(self, classname, name=None, capacity=None):
         self.resources.append(
-            {"class": classname, "name": name, "capacity": capacity})
+            {"class": classname, "name": name or f"{classname}_{len(self.resources)}", "capacity": capacity})
 
     def timeline(self, classname, name=None):
         timeline = Timeline(classname, name)
@@ -24,7 +24,7 @@ class Problem():
 
     def to_dict(self):
         return {"resources": self.resources,
-                "timelines": list(map(lambda t: t.to_dict(), self.timelines)),
+                "timelines": list(map(lambda t: t[1].to_dict(t[0]), enumerate(self.timelines))),
                 "facts": self.facts,
                 "goals": self.goals}
 
@@ -45,10 +45,10 @@ class Timeline():
         self.states.append({"name": name, "duration": dur,
                             "conditions": list(map(condition_to_dict, conditions or []))})
 
-    def to_dict(self):
+    def to_dict(self, idx):
         return {
             "class": self.classname,
-            "name": self.name,
+            "name": self.name or f"{self.classname}_{idx}",
             "states": self.states,
         }
 
