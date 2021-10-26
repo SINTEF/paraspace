@@ -252,7 +252,7 @@ pub fn solve(problem: &Problem) -> Result<Solution, SolverError> {
                         let token = &tokens[link.token_idx];
 
                         for token_idx in candidate_tokens.iter().copied() {
-                            // println!("linking value {} {}", value_idx, link.token_idx);
+                            println!("linking value {} {}", tokens[token_idx].value, token.value);
 
                             let temporal_rel = match temporal_relationship_type {
                                 TemporalType::Meet => vec![Real::_eq(

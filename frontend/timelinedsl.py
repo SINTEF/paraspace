@@ -9,8 +9,11 @@ class Problem():
         self.goals = []
 
     def resource(self, classname, name=None, capacity=None):
-        self.resources.append(
-            {"class": classname, "name": name or f"{classname}_{len(self.resources)}", "capacity": capacity})
+        if name is None:
+            name = f"{classname}_{len(self.resources)}"
+        resource = {"class": classname, "name": name, "capacity": capacity}
+        self.resources.append(resource)
+        return resource
 
     def timeline(self, classname, name=None):
         timeline = Timeline(classname, name)
