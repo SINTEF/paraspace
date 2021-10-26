@@ -1,23 +1,27 @@
+use timelinemodel::print_calc_time;
+
+mod multiplicity;
 mod problem;
 mod solver;
-mod multiplicity;
 fn main() {
-    println!("Hello, world!");
+    for plates in [1, 2] {
+        for n_carbonaras in [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 15, 20, 25, 30, 40, 50, 75, 100] {
+            let problem_name = format!("carbonara_{}p_{}c", plates, n_carbonaras);
+            let contents = std::fs::read_to_string(&format!("examples/{}.json", problem_name)).unwrap();
+            let problem = serde_json::de::from_str::<problem::Problem>(&contents).unwrap();
 
-    let contents =std::fs::read_to_string("carbonara_5_problem.json").unwrap();
-    let problem = serde_json::de::from_str::<problem::Problem>(&contents).unwrap();
-
-    println!("Problem:\n{:#?}", problem);
-    println!("Solving...");
-    let result = solver::solve(&problem);
-    match result {
-        Ok(solution) => {
-            println!("Success!");
-            std::fs::write("out.json", serde_json::to_string_pretty(&solution).unwrap()).unwrap();
-
-        }
-        Err(err) => {
-            println!("Error: {:#?}", err);
+            // println!("Problem:\n{:#?}", problem);
+            // println!("Solving...");
+            let result = print_calc_time(&problem_name, || solver::solve(&problem));
+            match result {
+                Ok(solution) => {
+                    // println!("Success!");
+                    std::fs::write(&format!("examples/{}.out.json", problem_name), serde_json::to_string_pretty(&solution).unwrap()).unwrap();
+                }
+                Err(err) => {
+                    println!("Error: {:#?}", err);
+                }
+            }
         }
     }
 }

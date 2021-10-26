@@ -1,3 +1,4 @@
+import json
 from collections import namedtuple
 
 class Problem():
@@ -27,6 +28,11 @@ class Problem():
                 "timelines": list(map(lambda t: t[1].to_dict(t[0]), enumerate(self.timelines))),
                 "facts": self.facts,
                 "goals": self.goals}
+
+    def save_json(self,fn):
+        with open(fn,"w") as f:
+            json.dump(self.to_dict(), f, indent=2)
+        print(f"Wrote problem instance to file {fn}")
 
 
 UseResource = namedtuple("UseResource", "resource,amount")

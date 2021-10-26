@@ -155,7 +155,7 @@ pub fn solve(problem: &Problem) -> Result<Solution, SolverError> {
                     } else {
                         // This state doesn't exist.
                         let disable = Bool::not(&token.active);
-                        println!("This state doesn't exist. Asserting {:?}", disable);
+                        // println!("This state doesn't exist. Asserting {:?}", disable);
                         solver.assert(&disable);
                     }
                 }
@@ -363,13 +363,13 @@ pub fn solve(problem: &Problem) -> Result<Solution, SolverError> {
         }
 
         let assumptions = expand_links.keys().map(|k| Bool::not(k)).collect::<Vec<_>>();
-        println!("{}", solver);
-        println!(
-            "Solving with {} tokens {} causal links {} extension points",
-            tokens.len(),
-            links.len(),
-            assumptions.len()
-        );
+        // println!("{}", solver);
+        // println!(
+        //     "Solving with {} tokens {} causal links {} extension points",
+        //     tokens.len(),
+        //     links.len(),
+        //     assumptions.len()
+        // );
         let result = solver.check_assumptions(&assumptions);
         match result {
             z3::SatResult::Unsat => {
@@ -416,7 +416,7 @@ pub fn solve(problem: &Problem) -> Result<Solution, SolverError> {
                     })
                 }
 
-                println!("SOLUTION {:#?}", timelines);
+                // println!("SOLUTION {:#?}", timelines);
 
                 return Ok(Solution { timelines });
             }

@@ -25,8 +25,8 @@ for timeline in model["timelines"]:
     y_names[timeline["name"]] = len(y_stack)
     intervals = []
     for token in timeline["tokens"]:
-        start = token["start_time"] or token["end_time"] - 1
-        end = token["end_time"] or token["start_time"] + 1
+        start = token["start_time"] if token["start_time"] is not None else  token["end_time"] - 1
+        end = token["end_time"] if token["end_time"] is not None else  token["start_time"] + 1
         intervals.append((start, end, colors[len(intervals) % len(colors)], token["value"]))
     y_stack.append( { "name": timeline["name"], "intervals" : intervals })
 
