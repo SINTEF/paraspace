@@ -43,6 +43,7 @@ TransitionFrom = namedtuple("TransitionFrom", "value")
 MetBy = namedtuple("MetBy", "timelineref,value")
 During = namedtuple("During", "timelineref,value")
 Any = namedtuple("Any", "classname")
+ProvideResource = namedtuple("ProvideResource", "classname,capacity")
 
 class Timeline():
     def __init__(self, classname, name=None):
@@ -79,4 +80,6 @@ def condition_to_dict(condition):
         return { "MetBy": [ objectref_to_dict(condition.timelineref), condition.value ]}
     elif isinstance(condition, During):
         return { "During": [ objectref_to_dict(condition.timelineref), condition.value ]}
+    elif isinstance(condition, ProvideResource):
+        return { "ProvideResource": [ condition.classname, condition.capacity ]}
     raise Exception(f"Unknown condition type {condition}")

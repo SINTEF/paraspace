@@ -74,6 +74,7 @@ pub struct State {
 #[derive(Serialize, Deserialize)]
 #[derive(Debug)]
 pub enum Condition {
+    ProvideResource(String, u32),
     UseResource(ObjectRef, u32),
     TransitionFrom(String),
     During(ObjectRef, String),

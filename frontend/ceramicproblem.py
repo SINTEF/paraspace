@@ -5,14 +5,13 @@ for (n_kilns,n_pieces) in [(1,2),(2,4),(2,6),(4,6),(5,10)]:
     p = Problem()
     p.resource("Electricity", capacity=1)
 
-    kiln_capacities = []
     for kiln_idx in range(n_kilns):
         kiln = p.timeline("Kiln", f"kiln_{kiln_idx}")
         kiln.state("Ready", conditions=[TransitionFrom("Fire")])
         kiln.state("Fire", dur=(20,20), conditions=[
             TransitionFrom("Ready"), 
-            UseResource(Any("Electricity"), 1)])
-        kiln_capacities.append(p.resource("KilnSpace", capacity=2))
+            UseResource(Any("Electricity"), 1),
+            ProvideResource("KilnFire", 2)])
         p.fact(f"kiln_{kiln_idx}", "Ready")
 
     piece_param_types = [(5,2),(8,3),(11,1)]

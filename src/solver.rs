@@ -12,16 +12,18 @@ pub enum SolverError {
 }
 
 pub enum LinkCondition<'a> {
-    Resource(&'a ObjectRef, u32),
+    UseResource(&'a ObjectRef, u32),
+    ProvideResource(&'a str, u32),
     Temporal(TemporalType, Result<&'a ObjectRef, &'a str>, &'a str),
 }
 
 pub fn convert_condition<'a>(this: &'a str, cond: &'a Condition) -> LinkCondition<'a> {
     match cond {
-        Condition::UseResource(o, a) => LinkCondition::Resource(o, *a),
+        Condition::UseResource(o, a) => LinkCondition::UseResource(o, *a),
         Condition::TransitionFrom(v) => LinkCondition::Temporal(TemporalType::Meet, Err(this), v),
         Condition::During(o, x) => LinkCondition::Temporal(TemporalType::Cover, Ok(o), x),
         Condition::MetBy(o, x) => LinkCondition::Temporal(TemporalType::Meet, Ok(o), x),
+        Condition::ProvideResource(class, capacity) => LinkCondition::ProvideResource(class, *capacity),
     }
 }
 
@@ -170,13 +172,15 @@ pub fn solve(problem: &Problem) -> Result<Solution, SolverError> {
 
                 // println!("Expanding link for {}", token.value);
                 match convert_condition(timeline_name, link.condition) {
-                    LinkCondition::Resource(obj, amount) => {
+                    LinkCondition::UseResource(obj, amount) => {
                         resource_constraints
                             .entry(obj)
                             .or_default()
                             .users
                             .push((link.token_idx, amount));
                     }
+
+                    LinkCondition::ProvideResource(class, capacity) => {}
 
                     LinkCondition::Temporal(temporal_relationship_type, objref, target_value) => {
                         // All eligible objects for linking to.
@@ -299,8 +303,6 @@ pub fn solve(problem: &Problem) -> Result<Solution, SolverError> {
             }
         }
 
-        // Need to check all the resource constraints to see if they need to be "integrated".
-        // The resource constraints cannot generate new tokens or links, so this can be done in a separate non-loop here.
         for (obj, rc) in resource_constraints.iter() {
             // We don't yet support name-based and class-based resource references at the same time,
             // so check that the spec doesn't do that.
@@ -313,9 +315,15 @@ pub fn solve(problem: &Problem) -> Result<Solution, SolverError> {
                     return Err(SolverError::UnsupportedInput);
                 }
             }
+        }
 
+        // Need to check all the resource constraints to see if they need to be "integrated".
+        // The resource constraints cannot generate new tokens or links, so this can be done in a separate non-loop here.
+        for (obj, rc) in resource_constraints.iter_mut() {
             if rc.users.len() > rc.integrated {
                 // We need to update the constraint.
+
+                rc.integrated = rc.users.len();
 
                 if !rc.closed {
                     // TODO: make an extension point in the pseudo-boolean constraint for adding more usages later.
@@ -363,13 +371,13 @@ pub fn solve(problem: &Problem) -> Result<Solution, SolverError> {
         }
 
         let assumptions = expand_links.keys().map(|k| Bool::not(k)).collect::<Vec<_>>();
-        // println!("{}", solver);
-        // println!(
-        //     "Solving with {} tokens {} causal links {} extension points",
-        //     tokens.len(),
-        //     links.len(),
-        //     assumptions.len()
-        // );
+        println!("{}", solver);
+        println!(
+            "Solving with {} tokens {} causal links {} extension points",
+            tokens.len(),
+            links.len(),
+            assumptions.len()
+        );
         let result = solver.check_assumptions(&assumptions);
         match result {
             z3::SatResult::Unsat => {
@@ -378,7 +386,9 @@ pub fn solve(problem: &Problem) -> Result<Solution, SolverError> {
                     return Err(SolverError::NoSolution);
                 }
 
+                println!("CORE {:?}", core);
                 for c in core {
+                    
                     let _link_idx = expand_links.remove(&c).unwrap();
                     todo!("Expand link_idx");
                 }
