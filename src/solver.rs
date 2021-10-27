@@ -94,7 +94,13 @@ pub fn solve(problem: &Problem) -> Result<Solution, SolverError> {
             }
         }
 
-         println!("Adding token[{}] {} {} {}", if fact { "fact"} else {"goal"}, tokens.len(), token_spec.timeline_name, token_spec.value);
+        // println!(
+        //     "Adding token[{}] {} {} {}",
+        //     if fact { "fact" } else { "goal" },
+        //     tokens.len(),
+        //     token_spec.timeline_name,
+        //     token_spec.value
+        // );
 
         tokens.push(Token {
             timeline_name: &token_spec.timeline_name,
@@ -122,7 +128,7 @@ pub fn solve(problem: &Problem) -> Result<Solution, SolverError> {
                 let token_idx = token_queue;
                 let token = &tokens[token_idx];
                 token_queue += 1;
-                println!("token idx {}", token_idx);
+                // println!("token idx {}", token_idx);
 
                 // Process newly added token:
                 //  - add its internal constraints (duration limits), and
@@ -143,7 +149,8 @@ pub fn solve(problem: &Problem) -> Result<Solution, SolverError> {
                 }
 
                 // let timeline_name = problem.timelines[token.timeline_idx].name.as_str();
-                println!("Looking up {}.{}",token.timeline_name,token.value);
+                // println!("Looking up {}.{}", token.timeline_name, token.value);
+
                 let timeline_idx = timelines_by_name[token.timeline_name];
                 if let Some(state) = problem.timelines[timeline_idx]
                     .states
@@ -191,7 +198,7 @@ pub fn solve(problem: &Problem) -> Result<Solution, SolverError> {
                     link_queue += 1;
                     link_idx
                 } else {
-                    println!("Expanding link from expand queue.");
+                    // println!("Expanding link from expand queue.");
                     expand_links_queue.pop().unwrap()
                 };
 
@@ -270,6 +277,16 @@ pub fn solve(problem: &Problem) -> Result<Solution, SolverError> {
                         let new_token_idx = tokens.len();
                         //     let token_active = ;
 
+                        if !timelines_by_name.contains_key(obj_name)
+                            || !problem.timelines[timelines_by_name[obj_name]]
+                                .states
+                                .iter()
+                                .any(|s| s.name == link.linkspec.value)
+                        {
+                            // This value cannot be created.
+                            continue;
+                        }
+
                         // TODO check that multiplicity is not maxed.
                         tokens.push(Token {
                             timeline_name: obj_name,
@@ -298,14 +315,14 @@ pub fn solve(problem: &Problem) -> Result<Solution, SolverError> {
                 let token = &tokens[link.token_idx];
 
                 for token_idx in new_target_tokens.iter().copied() {
-                    println!(
-                        "linking value {}.{} {}.{}\n --{:?}",
-                        tokens[token_idx].timeline_name,
-                        tokens[token_idx].value,
-                        token.timeline_name,
-                        token.value,
-                        link.linkspec
-                    );
+                    // println!(
+                    //     "linking value {}.{} {}.{}\n --{:?}",
+                    //     tokens[token_idx].timeline_name,
+                    //     tokens[token_idx].value,
+                    //     token.timeline_name,
+                    //     token.value,
+                    //     link.linkspec
+                    // );
 
                     // Represents the usage of the causal link.
                     let choose_link = Bool::fresh_const(&ctx, "cl");
@@ -328,13 +345,12 @@ pub fn solve(problem: &Problem) -> Result<Solution, SolverError> {
                     };
 
                     if link.linkspec.amount > 0 {
-                        println!("Link has amount {:?}", link.linkspec);
+                        // println!("Link has amount {:?}", link.linkspec);
                         // Add resource constraint for this token.
-                        resource_constraints.entry(token_idx).or_default().users.push((
-                            choose_link.clone(),
-                            link.token_idx,
-                            link.linkspec.amount,
-                        ));
+                        let rc = resource_constraints.entry(token_idx).or_default();
+                        assert!(!rc.closed);
+                        rc.users
+                            .push((choose_link.clone(), link.token_idx, link.linkspec.amount));
                     }
 
                     // The choose_link boolean implies all the condntions.
@@ -416,12 +432,12 @@ pub fn solve(problem: &Problem) -> Result<Solution, SolverError> {
 
                     let overlaps_refs = overlaps.iter().map(|(o, c)| (o, *c as i32)).collect::<Vec<_>>();
 
-                    println!(
-                        "Adding resource constraint for {}.{} with size {}",
-                        tokens[*_token_idx].timeline_name,
-                        tokens[*_token_idx].value,
-                        overlaps.len()
-                    );
+                    // println!(
+                    //     "Adding resource constraint for {}.{} with size {}",
+                    //     tokens[*_token_idx].timeline_name,
+                    //     tokens[*_token_idx].value,
+                    //     overlaps.len()
+                    // );
                     solver.assert(&Bool::pb_le(&ctx, &overlaps_refs, rc.capacity.unwrap() as i32));
                 }
             }
@@ -434,13 +450,13 @@ pub fn solve(problem: &Problem) -> Result<Solution, SolverError> {
         }
 
         let assumptions = expand_links_lits.keys().cloned().collect::<Vec<_>>();
-        println!("{}", solver);
-        println!(
-            "Solving with {} tokens {} causal links {} extension points",
-            tokens.len(),
-            links.len(),
-            assumptions.len()
-        );
+        // println!("{}", solver);
+        // println!(
+        //     "Solving with {} tokens {} causal links {} extension points",
+        //     tokens.len(),
+        //     links.len(),
+        //     assumptions.len()
+        // );
         let result = solver.check_assumptions(&assumptions);
         match result {
             z3::SatResult::Unsat => {
@@ -467,6 +483,10 @@ pub fn solve(problem: &Problem) -> Result<Solution, SolverError> {
 
                 let mut solution_tokens = Vec::new();
                 for v in tokens.iter() {
+                    if !model.eval(&v.active, true).unwrap().as_bool().unwrap() {
+                        continue;
+                    }
+
                     let start_time = v
                         .start_time
                         .as_ref()
