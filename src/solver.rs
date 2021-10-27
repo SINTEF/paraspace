@@ -32,15 +32,15 @@ pub fn solve(problem: &Problem) -> Result<Solution, SolverError> {
         .collect::<HashMap<_, _>>();
 
     let mut tokens = Vec::new();
-    let mut tokens_by_name_and_generation: HashMap<(&str, &str), Vec<(usize, usize)>> = HashMap::new();
+    let mut tokens_by_name: HashMap<(&str, &str), Vec<usize>> = HashMap::new();
     let mut token_queue = 0;
 
     let mut links = Vec::new();
     let mut link_queue = 0;
 
     let mut resource_constraints: HashMap<usize, ResourceConstraint> = Default::default(); // token to resourceconstraint
-    
-    let mut expand_links_queue :Vec<usize> = Vec::new();
+
+    let mut expand_links_queue: Vec<usize> = Vec::new();
     let mut expand_links_lits: HashMap<Bool, usize> = HashMap::new();
     let mut need_more_links_than = 0;
 
@@ -50,17 +50,33 @@ pub fn solve(problem: &Problem) -> Result<Solution, SolverError> {
         let (fact, start_time, end_time) = match token_spec.const_time {
             TokenTime::Fact(start, end) => (
                 true,
-                Some(
-                    start
-                        .map(|t| Real::from_real(&ctx, t as i32, 1))
-                        .unwrap_or_else(|| Real::fresh_const(&ctx, &format!("t_{}_{}_start_{}",token_spec.timeline_name, token_spec.value, token_idx))),
-                ),
-                Some(
-                    end.map(|t| Real::from_real(&ctx, t as i32, 1))
-                        .unwrap_or_else(|| Real::fresh_const(&ctx, &format!("t_{}_{}_end_{}",token_spec.timeline_name, token_spec.value, token_idx))),
-                ),
+                Some(start.map(|t| Real::from_real(&ctx, t as i32, 1)).unwrap_or_else(|| {
+                    Real::fresh_const(
+                        &ctx,
+                        &format!(
+                            "t_{}_{}_start_{}",
+                            token_spec.timeline_name, token_spec.value, token_idx
+                        ),
+                    )
+                })),
+                Some(end.map(|t| Real::from_real(&ctx, t as i32, 1)).unwrap_or_else(|| {
+                    Real::fresh_const(
+                        &ctx,
+                        &format!("t_{}_{}_end_{}", token_spec.timeline_name, token_spec.value, token_idx),
+                    )
+                })),
             ),
-            TokenTime::Goal => (false, Some(Real::fresh_const(&ctx, &format!("t_{}_{}_gstart_{}",token_spec.timeline_name, token_spec.value, token_idx))), None),
+            TokenTime::Goal => (
+                false,
+                Some(Real::fresh_const(
+                    &ctx,
+                    &format!(
+                        "t_{}_{}_gstart_{}",
+                        token_spec.timeline_name, token_spec.value, token_idx
+                    ),
+                )),
+                None,
+            ),
         };
         if !fact {
             let timeline_idx = *timelines_by_name
@@ -78,7 +94,7 @@ pub fn solve(problem: &Problem) -> Result<Solution, SolverError> {
             }
         }
 
-        // println!("Adding token {} {} {}", if fact { "fact"} else {"goal"}, token_spec.timeline_name, token_spec.value);
+         println!("Adding token[{}] {} {} {}", if fact { "fact"} else {"goal"}, tokens.len(), token_spec.timeline_name, token_spec.value);
 
         tokens.push(Token {
             timeline_name: &token_spec.timeline_name,
@@ -90,10 +106,10 @@ pub fn solve(problem: &Problem) -> Result<Solution, SolverError> {
         });
         resource_constraints.entry(token_idx).or_default().capacity = Some(token_spec.capacity);
 
-        tokens_by_name_and_generation
+        tokens_by_name
             .entry((&token_spec.timeline_name, &token_spec.value))
             .or_default()
-            .push((0, token_idx));
+            .push(token_idx);
     }
 
     // println!("Tokens: {:?}", tokens_by_name);
@@ -106,6 +122,7 @@ pub fn solve(problem: &Problem) -> Result<Solution, SolverError> {
                 let token_idx = token_queue;
                 let token = &tokens[token_idx];
                 token_queue += 1;
+                println!("token idx {}", token_idx);
 
                 // Process newly added token:
                 //  - add its internal constraints (duration limits), and
@@ -116,13 +133,17 @@ pub fn solve(problem: &Problem) -> Result<Solution, SolverError> {
                 // Facts don't need causal links or duration constraints.
                 if token.fact {
                     solver.assert(&Real::le(
-                        &Real::add(&ctx, &[token.start_time.as_ref().unwrap(), &Real::from_real(&ctx, 1, 1)]),
+                        &Real::add(
+                            &ctx,
+                            &[token.start_time.as_ref().unwrap(), &Real::from_real(&ctx, 1, 1)],
+                        ),
                         token.end_time.as_ref().unwrap(),
                     ));
                     continue;
                 }
 
                 // let timeline_name = problem.timelines[token.timeline_idx].name.as_str();
+                println!("Looking up {}.{}",token.timeline_name,token.value);
                 let timeline_idx = timelines_by_name[token.timeline_name];
                 if let Some(state) = problem.timelines[timeline_idx]
                     .states
@@ -165,7 +186,6 @@ pub fn solve(problem: &Problem) -> Result<Solution, SolverError> {
                 }
             }
             while !expand_links_queue.is_empty() || link_queue < links.len() {
-                
                 let link_idx = if link_queue < links.len() {
                     let link_idx = link_queue;
                     link_queue += 1;
@@ -193,12 +213,19 @@ pub fn solve(problem: &Problem) -> Result<Solution, SolverError> {
                     }
                 };
 
-                let mut new_alternatives = Vec::new();
+                let mut alternatives = Vec::new();
 
-                let mut candidate_tokens = Vec::new();
+                let mut all_target_tokens = Vec::new();
+                let mut new_target_tokens = Vec::new();
                 for obj in objects.iter() {
-                    if let Some(token_ref_list) = tokens_by_name_and_generation.get(&(obj, &link.linkspec.value)) {
-                        candidate_tokens.extend(token_ref_list.iter().filter_map(|(gen,tok)| *tok));
+                    if let Some(token_ref_list) = tokens_by_name.get(&(obj, &link.linkspec.value)) {
+                        for token in token_ref_list.iter() {
+                            all_target_tokens.push(*token);
+
+                            if *token > link.token_queue {
+                                new_target_tokens.push(*token);
+                            }
+                        }
                     }
                 }
 
@@ -213,11 +240,13 @@ pub fn solve(problem: &Problem) -> Result<Solution, SolverError> {
                     })
                     .sum::<usize>();
 
+                let old_expansion_lit: Option<Bool> = links[link_idx].alternatives_extension.take();
+
                 if total_multiplicity >= 2 {
                     let expand_lit = Bool::fresh_const(&ctx, "exp");
                     expand_links_lits.insert(Bool::not(&expand_lit), link_idx);
                     links[link_idx].alternatives_extension = Some(expand_lit.clone());
-                    new_alternatives.push(expand_lit);
+                    alternatives.push(expand_lit);
                 } else {
                     // println!(
                     //     "NO MORE ALTERNATIVES FOR {} {}",
@@ -226,34 +255,57 @@ pub fn solve(problem: &Problem) -> Result<Solution, SolverError> {
                 }
 
                 let link = &links[link_idx];
-                if candidate_tokens.is_empty() {
+                if new_target_tokens.is_empty() {
                     // Select a object at random
                     // TODO make a heuristic for this
 
-                    if let Some(obj_name) = objects.get(0) {
+                    #[allow(clippy::never_loop)] // TODO multiplicity check will allow this to loop
+                    for i in 0..objects.len() {
+                        // if let Some(obj_name) = objects {
+
+                        // This is a "random" heuristic for which object to expand.
+                        let selected_object = (tokens.len() + links.len() + i) % objects.len();
+
+                        let obj_name = objects[selected_object];
                         let new_token_idx = tokens.len();
                         //     let token_active = ;
 
+                        // TODO check that multiplicity is not maxed.
                         tokens.push(Token {
                             timeline_name: obj_name,
                             active: Bool::fresh_const(&ctx, "pre"),
                             fact: false,
                             value: &link.linkspec.value,
-                            start_time: Some(Real::fresh_const(&ctx, &format!("t_{}_{}_start_{}",obj_name, link.linkspec.value, new_token_idx))),
-                            end_time: Some(Real::fresh_const(&ctx, &format!("t_{}_{}_start_{}",obj_name, link.linkspec.value, new_token_idx))),
+                            start_time: Some(Real::fresh_const(
+                                &ctx,
+                                &format!("t_{}_{}_start_{}", obj_name, link.linkspec.value, new_token_idx),
+                            )),
+                            end_time: Some(Real::fresh_const(
+                                &ctx,
+                                &format!("t_{}_{}_end_{}", obj_name, link.linkspec.value, new_token_idx),
+                            )),
                         });
 
-                        candidate_tokens.push(new_token_idx);
-                        tokens_by_name_and_generation
+                        new_target_tokens.push(new_token_idx);
+                        tokens_by_name
                             .entry((obj_name, &link.linkspec.value))
                             .or_default()
                             .push(new_token_idx);
+                        // }
+                        break;
                     }
                 }
                 let token = &tokens[link.token_idx];
 
-                for token_idx in candidate_tokens.iter().copied() {
-                    println!("linking value {}.{} {}.{}\n --{:?}", tokens[token_idx].timeline_name, tokens[token_idx].value, token.timeline_name, token.value, link.linkspec);
+                for token_idx in new_target_tokens.iter().copied() {
+                    println!(
+                        "linking value {}.{} {}.{}\n --{:?}",
+                        tokens[token_idx].timeline_name,
+                        tokens[token_idx].value,
+                        token.timeline_name,
+                        token.value,
+                        link.linkspec
+                    );
 
                     // Represents the usage of the causal link.
                     let choose_link = Bool::fresh_const(&ctx, "cl");
@@ -290,10 +342,13 @@ pub fn solve(problem: &Problem) -> Result<Solution, SolverError> {
                         solver.assert(&Bool::implies(&choose_link, cond));
                     }
 
-                    new_alternatives.push(choose_link);
+                    alternatives.push(choose_link);
                 }
 
-                let alternatives_refs = new_alternatives.iter().collect::<Vec<_>>();
+                let need_alternatives = old_expansion_lit.unwrap_or_else(|| tokens[link.token_idx].active.clone());
+                alternatives.push(Bool::not(&need_alternatives));
+
+                let alternatives_refs = alternatives.iter().collect::<Vec<_>>();
                 // println!(
                 //     "TOKEN LINKS for {}.{}[{}] has {} alternatives",
                 //     problem.timelines[tokens[link.token_idx].timeline_idx].name,
@@ -301,10 +356,9 @@ pub fn solve(problem: &Problem) -> Result<Solution, SolverError> {
                 //     link.token_idx,
                 //     alternatives.len()
                 // );
-                solver.assert(&Bool::implies(
-                    &tokens[link.token_idx].active,
-                    &Bool::or(&ctx, &alternatives_refs),
-                ));
+                solver.assert(&Bool::or(&ctx, &alternatives_refs));
+
+                links[link_idx].token_queue = tokens.len();
             }
         }
 
@@ -362,7 +416,12 @@ pub fn solve(problem: &Problem) -> Result<Solution, SolverError> {
 
                     let overlaps_refs = overlaps.iter().map(|(o, c)| (o, *c as i32)).collect::<Vec<_>>();
 
-                    println!("Adding resource constraint for {}.{} with size {}", tokens[*_token_idx].timeline_name, tokens[*_token_idx].value, overlaps.len());
+                    println!(
+                        "Adding resource constraint for {}.{} with size {}",
+                        tokens[*_token_idx].timeline_name,
+                        tokens[*_token_idx].value,
+                        overlaps.len()
+                    );
                     solver.assert(&Bool::pb_le(&ctx, &overlaps_refs, rc.capacity.unwrap() as i32));
                 }
             }
@@ -396,7 +455,7 @@ pub fn solve(problem: &Problem) -> Result<Solution, SolverError> {
                     let link = &links[link_idx];
                     let token = &tokens[link.token_idx];
                     // println!("  -expand {}.{} {:?}", token.timeline_name, token.value, link.linkspec);
-                    
+
                     // TODO heuristically decide which and how many to expand.s
                     expand_links_queue.push(link_idx);
                     need_more_links_than = links.len();
