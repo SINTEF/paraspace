@@ -116,7 +116,7 @@ pub fn solve(problem: &Problem) -> Result<Solution, SolverError> {
 
     loop {
         // Expand the graph and try to solve
-        while token_queue < tokens.len() || link_queue < links.len() {
+        while token_queue < tokens.len() || !expand_links_queue.is_empty() || link_queue < links.len() {
             while token_queue < tokens.len() {
                 // add all the links for the value
                 let token_idx = token_queue;
@@ -222,7 +222,7 @@ pub fn solve(problem: &Problem) -> Result<Solution, SolverError> {
                         for token in token_ref_list.iter() {
                             all_target_tokens.push(*token);
 
-                            if *token > link.token_queue {
+                            if *token >= link.token_queue {
                                 new_target_tokens.push(*token);
                             }
                         }
