@@ -32,14 +32,17 @@ pub fn solve(problem: &Problem) -> Result<Solution, SolverError> {
         .collect::<HashMap<_, _>>();
 
     let mut tokens = Vec::new();
-    let mut tokens_by_name: HashMap<(&str, &str), Vec<usize>> = HashMap::new();
+    let mut tokens_by_name_and_generation: HashMap<(&str, &str), Vec<(usize, usize)>> = HashMap::new();
     let mut token_queue = 0;
 
     let mut links = Vec::new();
     let mut link_queue = 0;
 
     let mut resource_constraints: HashMap<usize, ResourceConstraint> = Default::default(); // token to resourceconstraint
-    let mut expand_links: HashMap<Bool, usize> = HashMap::new();
+    
+    let mut expand_links_queue :Vec<usize> = Vec::new();
+    let mut expand_links_lits: HashMap<Bool, usize> = HashMap::new();
+    let mut need_more_links_than = 0;
 
     // Pre-specified tokens: facts and goals.
     for token_spec in problem.tokens.iter() {
@@ -87,10 +90,10 @@ pub fn solve(problem: &Problem) -> Result<Solution, SolverError> {
         });
         resource_constraints.entry(token_idx).or_default().capacity = Some(token_spec.capacity);
 
-        tokens_by_name
+        tokens_by_name_and_generation
             .entry((&token_spec.timeline_name, &token_spec.value))
             .or_default()
-            .push(token_idx);
+            .push((0, token_idx));
     }
 
     // println!("Tokens: {:?}", tokens_by_name);
@@ -152,6 +155,7 @@ pub fn solve(problem: &Problem) -> Result<Solution, SolverError> {
                             linkspec: condition,
                             alternatives: Vec::new(),
                             alternatives_extension: None,
+                            token_queue: 0,
                         });
                     }
                 } else {
@@ -160,9 +164,16 @@ pub fn solve(problem: &Problem) -> Result<Solution, SolverError> {
                     solver.assert(&disable);
                 }
             }
-            while link_queue < links.len() {
-                let link_idx = link_queue;
-                link_queue += 1;
+            while !expand_links_queue.is_empty() || link_queue < links.len() {
+                
+                let link_idx = if link_queue < links.len() {
+                    let link_idx = link_queue;
+                    link_queue += 1;
+                    link_idx
+                } else {
+                    println!("Expanding link from expand queue.");
+                    expand_links_queue.pop().unwrap()
+                };
 
                 let link = &links[link_idx];
                 // let token = &tokens[link.token_idx];
@@ -186,8 +197,8 @@ pub fn solve(problem: &Problem) -> Result<Solution, SolverError> {
 
                 let mut candidate_tokens = Vec::new();
                 for obj in objects.iter() {
-                    if let Some(token_ref_list) = tokens_by_name.get(&(obj, &link.linkspec.value)) {
-                        candidate_tokens.extend(token_ref_list.iter().copied());
+                    if let Some(token_ref_list) = tokens_by_name_and_generation.get(&(obj, &link.linkspec.value)) {
+                        candidate_tokens.extend(token_ref_list.iter().filter_map(|(gen,tok)| *tok));
                     }
                 }
 
@@ -204,7 +215,7 @@ pub fn solve(problem: &Problem) -> Result<Solution, SolverError> {
 
                 if total_multiplicity >= 2 {
                     let expand_lit = Bool::fresh_const(&ctx, "exp");
-                    expand_links.insert(Bool::not(&expand_lit), link_idx);
+                    expand_links_lits.insert(Bool::not(&expand_lit), link_idx);
                     links[link_idx].alternatives_extension = Some(expand_lit.clone());
                     new_alternatives.push(expand_lit);
                 } else {
@@ -233,7 +244,7 @@ pub fn solve(problem: &Problem) -> Result<Solution, SolverError> {
                         });
 
                         candidate_tokens.push(new_token_idx);
-                        tokens_by_name
+                        tokens_by_name_and_generation
                             .entry((obj_name, &link.linkspec.value))
                             .or_default()
                             .push(new_token_idx);
@@ -357,7 +368,13 @@ pub fn solve(problem: &Problem) -> Result<Solution, SolverError> {
             }
         }
 
-        let assumptions = expand_links.keys().cloned().collect::<Vec<_>>();
+        if need_more_links_than > 0 && need_more_links_than == links.len() {
+            // TODO this is not complete if we don't expand ALL of the core below. (but we do expand all, for now.)
+            println!("Didn't expand any links!");
+            return Err(SolverError::NoSolution);
+        }
+
+        let assumptions = expand_links_lits.keys().cloned().collect::<Vec<_>>();
         println!("{}", solver);
         println!(
             "Solving with {} tokens {} causal links {} extension points",
@@ -373,16 +390,17 @@ pub fn solve(problem: &Problem) -> Result<Solution, SolverError> {
                     return Err(SolverError::NoSolution);
                 }
 
-                println!("CORE {:?}", core);
+                // println!("CORE {:?}", core);
                 for c in core {
-                    let link_idx = expand_links.remove(&c).unwrap();
+                    let link_idx = expand_links_lits.remove(&c).unwrap();
                     let link = &links[link_idx];
                     let token = &tokens[link.token_idx];
-                    println!("  -expand {}.{} {:?}", token.timeline_name, token.value, link.linkspec);
+                    // println!("  -expand {}.{} {:?}", token.timeline_name, token.value, link.linkspec);
                     
+                    // TODO heuristically decide which and how many to expand.s
+                    expand_links_queue.push(link_idx);
+                    need_more_links_than = links.len();
                 }
-
-                todo!("Expand link_idx");
             }
 
             z3::SatResult::Sat => {
@@ -431,6 +449,7 @@ fn from_z3_real(real: &Real) -> f32 {
 struct Link<'a, 'z3> {
     token_idx: usize,
     linkspec: &'a Condition,
+    token_queue: usize,
     alternatives: Vec<(usize, Bool<'z3>)>,
     alternatives_extension: Option<Bool<'z3>>,
 }
