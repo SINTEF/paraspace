@@ -1,36 +1,39 @@
 import json
-from collections import namedtuple
+from collections import defaultdict, namedtuple
+from dataclasses import dataclass
+from typing import Any
+
 
 class Problem():
     def __init__(self):
-        self.resources = []
         self.timelines = []
-        self.facts = []
-        self.goals = []
+        self.tokens = []
+        self.groups = defaultdict(list)
 
-    def resource(self, classname, name=None, capacity=None):
+    def resource(self, classname, name=None, capacity=0):
         if name is None:
-            name = f"{classname}_{len(self.resources)}"
-        resource = {"class": classname, "name": name, "capacity": capacity}
-        self.resources.append(resource)
-        return resource
+            name = f"{classname}_{len(self.tokens)}"
+        self.tokens.append({ "timeline_name": name, "value": "Available",  "const_time": { "Fact": [None, None] }, "capacity": capacity})
+        self.groups[classname].append(name)
 
     def timeline(self, classname, name=None):
+        if name is None:
+            name = f"{classname}_{len(self.timelines)}"
         timeline = Timeline(classname, name)
         self.timelines.append(timeline)
+        self.groups[classname].append(name)
         return timeline
 
-    def goal(self, timeline, value):
-        self.goals.append({"timeline_name": timeline, "value": value})
+    def goal(self, timeline, value, capacity=0):
+        self.tokens.append({"timeline_name": timeline, "value": value, "const_time": { "Goal": None }, "capacity": capacity})
 
-    def fact(self, timeline, value):
-        self.facts.append({"timeline_name": timeline, "value": value})
+    def fact(self, timeline, value, capacity=0):
+        self.tokens.append({"timeline_name": timeline, "value": value, "const_time": { "Fact": [None,None] }, "capacity": capacity})
 
     def to_dict(self):
-        return {"resources": self.resources,
-                "timelines": list(map(lambda t: t[1].to_dict(t[0]), enumerate(self.timelines))),
-                "facts": self.facts,
-                "goals": self.goals}
+        return {"groups": [{"name": key, "members": value } for key,value in self.groups.items()],
+                "timelines": list(map(lambda t: t.to_dict(), self.timelines)),
+                "tokens": self.tokens }
 
     def save_json(self,fn):
         with open(fn,"w") as f:
@@ -38,12 +41,36 @@ class Problem():
         print(f"Wrote problem instance to file {fn}")
 
 
-UseResource = namedtuple("UseResource", "resource,amount")
-TransitionFrom = namedtuple("TransitionFrom", "value")
-MetBy = namedtuple("MetBy", "timelineref,value")
-During = namedtuple("During", "timelineref,value")
-Any = namedtuple("Any", "classname")
-ProvideResource = namedtuple("ProvideResource", "classname,capacity")
+@dataclass
+class UseResource:
+    resource :Any
+    amount :int
+
+@dataclass
+class TransitionFrom:
+    value :Any
+
+@dataclass
+class MetBy:
+    timelineref: Any
+    value :Any
+    amount :int = 0
+
+@dataclass
+class During:
+    timelineref :Any
+    value :Any
+    amount :int = 0
+
+@dataclass
+class Any:
+    classname :Any
+
+# UseResource = namedtuple("UseResource", "resource,amount")
+# TransitionFrom = namedtuple("TransitionFrom", "value")
+# MetBy = namedtuple("MetBy", "timelineref,value,amount")
+# During = namedtuple("During", "timelineref,value,amount")
+# Any = namedtuple("Any", "classname")
 
 class Timeline():
     def __init__(self, classname, name=None):
@@ -51,35 +78,29 @@ class Timeline():
         self.name = name
         self.states = []
 
-    def state(self, name, dur=(1,None), conditions=None):
-        self.states.append({"name": name, "duration": dur,
-                            "conditions": list(map(condition_to_dict, conditions or []))})
+    def state(self, name, dur=(1,None), capacity=0, conditions=None):
+        self.states.append({"name": name, "duration": dur, "capacity": capacity,
+                            "conditions": list(map(lambda cond: condition_to_dict(self.name, cond), conditions or []))})
 
-    def to_dict(self, idx):
+    def to_dict(self):
         return {
-            "class": self.classname,
-            "name": self.name or f"{self.classname}_{idx}",
+            "name": self.name,
             "states": self.states,
         }
 
 def objectref_to_dict(objectref):
     if isinstance(objectref, Any):
-        return {"AnyOfClass": objectref.classname}
+        return {"Group": objectref.classname}
     else:
-        return {"Named": objectref}
+        return {"Object": objectref}
 
-def timelineref_to_dict(timelineref):
-    return { "timeline_name": timelineref }
-
-def condition_to_dict(condition):
+def condition_to_dict(obj_name, condition):
     if isinstance(condition, UseResource):
-        return { "UseResource": [ objectref_to_dict(condition.resource), condition.amount ]}
+        return { "temporal_relationship": "Cover", "object": objectref_to_dict(condition.resource), "value": "Available", "amount": condition.amount }
     elif isinstance(condition, TransitionFrom):
-        return { "TransitionFrom": condition.value}
+        return { "temporal_relationship": "Meet", "object": objectref_to_dict(obj_name), "value": condition.value, "amount": 0}
     elif isinstance(condition, MetBy):
-        return { "MetBy": [ objectref_to_dict(condition.timelineref), condition.value ]}
+        return { "temporal_relationship": "Meet", "object":  objectref_to_dict(condition.timelineref), "value": condition.value, "amount": condition.amount }
     elif isinstance(condition, During):
-        return { "During": [ objectref_to_dict(condition.timelineref), condition.value ]}
-    elif isinstance(condition, ProvideResource):
-        return { "ProvideResource": [ condition.classname, condition.capacity ]}
+        return { "temporal_relationship": "Cover", "object":  objectref_to_dict(condition.timelineref), "value": condition.value, "amount": condition.amount }
     raise Exception(f"Unknown condition type {condition}")

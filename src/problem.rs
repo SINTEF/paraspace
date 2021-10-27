@@ -2,63 +2,39 @@ use serde::{Serialize, Deserialize};
 
 #[derive(Serialize, Deserialize)]
 #[derive(Debug)]
-
-pub struct Solution {
-    pub timelines: Vec<SolutionTimeline>,
-}
-
-#[derive(Serialize, Deserialize)]
-#[derive(Debug)]
-
-pub struct SolutionTimeline {
-    pub name :String,
-    pub class :String,
-    pub tokens: Vec<SolutionToken>,
-}
-
-#[derive(Serialize, Deserialize)]
-#[derive(Debug)]
-pub struct SolutionToken {
-    pub value :String,
-    pub start_time :f32,
-    pub end_time :f32,
-}
-
-
-#[derive(Serialize, Deserialize)]
-#[derive(Debug)]
-
 pub struct Problem {
-    pub resources :Vec<Resource>,
     pub timelines :Vec<Timeline>,
-
-    /// A specific timeline has a specific value.
-    pub facts :Vec<TimelineValue>,
-
-    /// A specific timeline has a specific value.
-    pub goals :Vec<TimelineValue>,
+    pub groups: Vec<Group>,
+    pub tokens :Vec<Token>,
 }
 
 #[derive(Serialize, Deserialize)]
 #[derive(Debug)]
-pub struct TimelineValue {
+pub struct Group {
+    pub name :String,
+    pub members :Vec<String>,
+}
+
+
+#[derive(Serialize, Deserialize)]
+#[derive(Debug)]
+pub struct Token {
     pub timeline_name :String,
     pub value :String,
+    pub capacity :u32,
+    pub const_time :TokenTime,
 }
 
 #[derive(Serialize, Deserialize)]
 #[derive(Debug)]
-pub struct Resource {
-    pub class :String,
-    pub name :String,
-    pub capacity :u32,
+pub enum TokenTime {
+    Fact(Option<usize>, Option<usize>),
+    Goal,
 }
-
 
 #[derive(Serialize, Deserialize)]
 #[derive(Debug)]
 pub struct Timeline {
-    pub class :String,
     pub name :String,
     pub states :Vec<State>,
 }
@@ -69,25 +45,51 @@ pub struct State {
     pub name :String,
     pub duration :(usize,Option<usize>),
     pub conditions :Vec<Condition>,
+    pub capacity :u32,
 }
 
 #[derive(Serialize, Deserialize)]
 #[derive(Debug)]
-pub enum Condition {
-    ProvideResource(String, u32),
-    UseResource(ObjectRef, u32),
-    TransitionFrom(String),
-    During(ObjectRef, String),
-    MetBy(ObjectRef, String),
+pub struct Condition {
+    pub temporal_relationship: TemporalRelationship,
+    pub object: ObjectSet,
+    pub value: String,
+    pub amount: u32,
 }
 
-/// Refers to an object, i.e. a timeline or a resource:
-/// either any object of a given class or a specific object by name.
+#[derive(Serialize, Deserialize)]
+#[derive(Debug)]
+pub enum TemporalRelationship {
+    Meet,
+    Cover,
+}
+
 #[derive(Serialize, Deserialize)]
 #[derive(Debug)]
 #[derive(Clone)]
 #[derive(Hash, PartialEq, Eq, PartialOrd, Ord)]
-pub enum ObjectRef {
-    AnyOfClass(String),
-    Named(String),
+pub enum ObjectSet {
+    Group(String),
+    Object(String),
 }
+
+//
+// SOLUTION
+//
+
+
+#[derive(Serialize, Deserialize)]
+#[derive(Debug)]
+pub struct Solution {
+    pub tokens: Vec<SolutionToken>,
+}
+
+#[derive(Serialize, Deserialize)]
+#[derive(Debug)]
+pub struct SolutionToken {
+    pub object_name :String,
+    pub value :String,
+    pub start_time :f32,
+    pub end_time :f32,
+}
+

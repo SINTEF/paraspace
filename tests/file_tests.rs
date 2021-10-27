@@ -1,6 +1,6 @@
 use timelinemodel::{problem, solver};
 
-#[test]
+// #[test]
 pub fn carbonara5() {
     let problem = serde_json::de::from_str::<problem::Problem>(include_str!("carbonara_5_problem.json")).unwrap();
 

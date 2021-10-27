@@ -21,14 +21,18 @@ def rat(x):
 y_stack = []
 y_names = {}
 
-for timeline in model["timelines"]:
-    y_names[timeline["name"]] = len(y_stack)
+timelines = defaultdict(list)
+for token in model["tokens"]:
+    timelines[token["object_name"]].append(token)
+
+for (timeline_name,tokens) in timelines.items():
+    y_names[timeline_name] = len(y_stack)
     intervals = []
-    for token in timeline["tokens"]:
+    for token in tokens:
         start = token["start_time"] if token["start_time"] is not None else  token["end_time"] - 1
         end = token["end_time"] if token["end_time"] is not None else  token["start_time"] + 1
         intervals.append((start, end, colors[len(intervals) % len(colors)], token["value"]))
-    y_stack.append( { "name": timeline["name"], "intervals" : intervals })
+    y_stack.append( { "name": timeline_name, "intervals" : intervals })
 
 #y_names["visibility"] = len(y_stack)
 #y_stack.append({ "name": "visibility", "intervals": [(rat(x[0]),rat(x[1]),"red") for x in model["problem"]["visibility_time_windows"]] })

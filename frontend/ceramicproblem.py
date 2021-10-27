@@ -7,11 +7,10 @@ for (n_kilns,n_pieces) in [(1,2),(2,4),(2,6),(4,6),(5,10)]:
 
     for kiln_idx in range(n_kilns):
         kiln = p.timeline("Kiln", f"kiln_{kiln_idx}")
-        kiln.state("Ready", conditions=[TransitionFrom("Fire")])
-        kiln.state("Fire", dur=(20,20), conditions=[
+        kiln.state("Ready", dur=(5,None), conditions=[TransitionFrom("Fire")])
+        kiln.state("Fire", dur=(20,20), capacity=2, conditions=[
             TransitionFrom("Ready"), 
-            UseResource(Any("Electricity"), 1),
-            ProvideResource("KilnFire", 2)])
+            UseResource(Any("Electricity"), 1)])
         p.fact(f"kiln_{kiln_idx}", "Ready")
 
     piece_param_types = [(5,2),(8,3),(11,1)]
@@ -22,8 +21,7 @@ for (n_kilns,n_pieces) in [(1,2),(2,4),(2,6),(4,6),(5,10)]:
     for (piece_idx,(bake_time,treat_time)) in enumerate(pieces):
         piece = p.timeline("Piece", f"piece_{piece_idx}")
         piece.state("Baking", dur=(bake_time,bake_time), conditions=[
-            UseResource(Any("KilnSpace"), 1),
-            During(Any("Kiln"), "Fire"),
+            During(Any("Kiln"), "Fire", 1),
         ])
         piece.state("Baked", conditions=[TransitionFrom("Baking")])
         piece.state("Treating", dur=(treat_time, treat_time), 
@@ -41,8 +39,7 @@ for (n_kilns,n_pieces) in [(1,2),(2,4),(2,6),(4,6),(5,10)]:
         ])
         structure.state("Assembled", conditions=[TransitionFrom("Assembling")])
         structure.state("Baking", dur=(3,3), conditions=[
-            UseResource(Any("KilnSpace"), 1),
-            During(Any("Kiln"), "Fire"),
+            During(Any("Kiln"), "Fire", 1),
             TransitionFrom("Assembled"),
         ])
         structure.state("Baked", conditions=[TransitionFrom("Baking")])
