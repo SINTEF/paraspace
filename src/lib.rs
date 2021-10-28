@@ -1,7 +1,8 @@
 pub mod problem;
-pub mod solver;
+pub mod tokensolver;
 mod multiplicity;
-mod cores;
+pub mod transitionsolver;
+// mod cores;
 
 pub fn print_calc_time<T>(name: &str, f: impl FnOnce() -> T) -> T{
     use std::time::Instant;
@@ -14,4 +15,11 @@ pub fn print_calc_time<T>(name: &str, f: impl FnOnce() -> T) -> T{
     let elapsed = now.elapsed();
     println!("{} took {:.2?}", name, elapsed);
     result
+}
+
+#[derive(Clone, Debug)]
+pub enum SolverError {
+    NoSolution,
+    GoalValueDurationLimit,
+    GoalStateMissing,
 }

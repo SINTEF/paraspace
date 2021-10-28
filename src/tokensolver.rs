@@ -1,3 +1,4 @@
+use crate::SolverError;
 use z3::ast::Ast;
 use z3::ast::{Bool, Real};
 use z3::SatResult;
@@ -5,12 +6,7 @@ use z3::SatResult;
 use crate::{multiplicity::multiplicity_one, problem::*};
 use std::collections::HashMap;
 
-#[derive(Clone, Debug)]
-pub enum SolverError {
-    NoSolution,
-    GoalValueDurationLimit,
-    GoalStateMissing,
-}
+
 
 pub fn solve(problem: &Problem) -> Result<Solution, SolverError> {
     let z3_config = z3::Config::new();
@@ -541,16 +537,16 @@ pub fn solve(problem: &Problem) -> Result<Solution, SolverError> {
                     return Err(SolverError::NoSolution);
                 }
 
-                let use_trim_core = false;
-                let use_minimize_core = false;
+                // let use_trim_core = false;
+                // let use_minimize_core = false;
 
-                if use_trim_core {
-                    crate::cores::trim_core(&mut core, &solver);
-                }
+                // if use_trim_core {
+                //     crate::cores::trim_core(&mut core, &solver);
+                // }
 
-                if use_minimize_core {
-                    crate::cores::minimize_core(&mut core, &solver);
-                }
+                // if use_minimize_core {
+                //     crate::cores::minimize_core(&mut core, &solver);
+                // }
 
                 core_sizes.push(core.len());
                 println!("CORE SIZE #{}: {:?}", core_sizes.len(), core_sizes);

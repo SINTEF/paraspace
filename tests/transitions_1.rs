@@ -1,4 +1,4 @@
-use timelinemodel::{problem::*, solver::solve};
+use timelinemodel::{problem::*, tokensolver::solve};
 
 #[test]
 pub fn transitions_1() {
@@ -35,12 +35,9 @@ pub fn transitions_1() {
 
     let solution = solve(&problem).unwrap();
 println!("SOLUTION {:#?}", solution);
-    assert!(solution.timelines.len() == 1);
-    let timeline = &solution.timelines[0];
-    assert!(timeline.name == "obj");
-    assert!(timeline.tokens.len() == 2);
-    let token1 = &timeline.tokens[1];
-    let token2 = &timeline.tokens[0];
+    assert!(solution.tokens.len() == 2);
+    let token1 = &solution.tokens[1];
+    let token2 = &solution.tokens[0];
     assert!(token1.value == "s1");
     assert!(token2.value == "s2");
     assert!(token1.end_time - token1.start_time >= 5. && token1.end_time - token1.start_time <= 6.);

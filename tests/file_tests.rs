@@ -1,4 +1,4 @@
-use timelinemodel::{problem, solver};
+use timelinemodel::{problem, tokensolver};
 
 // #[test]
 pub fn carbonara5() {
@@ -6,7 +6,7 @@ pub fn carbonara5() {
 
     println!("Problem:\n{:#?}", problem);
     println!("Solving...");
-    let solution = solver::solve(&problem);
+    let solution = tokensolver::solve(&problem);
     match solution {
         Ok(_) => {
             println!("Success!")

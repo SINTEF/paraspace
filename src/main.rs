@@ -1,12 +1,6 @@
 use std::path::PathBuf;
-
 use structopt::StructOpt;
-use timelinemodel::print_calc_time;
-
-mod multiplicity;
-mod problem;
-mod solver;
-mod cores;
+use timelinemodel::{print_calc_time, problem, tokensolver};
 
 
 #[derive(Debug, StructOpt)]
@@ -35,7 +29,7 @@ fn main() {
     if let Some(filename) = opt.input {
         let contents = std::fs::read_to_string(&filename).unwrap();
         let problem = serde_json::de::from_str::<problem::Problem>(&contents).unwrap();
-        let result = print_calc_time(filename.to_str().unwrap(), || solver::solve(&problem));
+        let result = print_calc_time(filename.to_str().unwrap(), || tokensolver::solve(&problem));
         match result {
             Ok(solution) => {
                 println!("Solved.");
@@ -75,7 +69,7 @@ fn perftest() {
 
         // println!("Problem:\n{:#?}", problem);
         // println!("Solving...");
-        let result = print_calc_time(&problem_name, || solver::solve(&problem));
+        let result = print_calc_time(&problem_name, || tokensolver::solve(&problem));
         match result {
             Ok(solution) => {
                 // println!("Success!");
