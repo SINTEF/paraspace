@@ -6,6 +6,8 @@ use timelinemodel::print_calc_time;
 mod multiplicity;
 mod problem;
 mod solver;
+mod cores;
+
 
 #[derive(Debug, StructOpt)]
 #[structopt(name = "timelinemodel", about = "Timelines SMT-based solver.")]

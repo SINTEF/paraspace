@@ -31,7 +31,7 @@ for (timeline_name,tokens) in timelines.items():
     for token in tokens:
         start = token["start_time"] if token["start_time"] is not None else  token["end_time"] - 1
         end = token["end_time"] if token["end_time"] is not None else  token["start_time"] + 1
-        intervals.append((start, end, colors[len(intervals) % len(colors)], token["value"]))
+        intervals.append((start, end, colors[hash(token["value"]) % len(colors)], token["value"]))
     y_stack.append( { "name": timeline_name, "intervals" : intervals })
 
 #y_names["visibility"] = len(y_stack)

@@ -1,6 +1,7 @@
 pub mod problem;
 pub mod solver;
 mod multiplicity;
+mod cores;
 
 pub fn print_calc_time<T>(name: &str, f: impl FnOnce() -> T) -> T{
     use std::time::Instant;
