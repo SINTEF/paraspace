@@ -1,6 +1,6 @@
 from timelinedsl import *
 
-for (n_kilns,n_pieces) in [(1,2),(2,4),(2,6),(4,6),(5,10)]:
+for (n_kilns,n_pieces) in [(1,2),(2,4),(2,6),(4,6),(5,10),(1,10)]:
 
     p = Problem()
     p.resource("Electricity", capacity=1)

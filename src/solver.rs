@@ -1,5 +1,6 @@
 use z3::ast::Ast;
 use z3::ast::{Bool, Real};
+use z3::SatResult;
 
 use crate::{multiplicity::multiplicity_one, problem::*};
 use std::collections::HashMap;
@@ -35,12 +36,13 @@ pub fn solve(problem: &Problem) -> Result<Solution, SolverError> {
     let mut tokens_by_name: HashMap<(&str, &str), Vec<usize>> = HashMap::new();
     let mut token_queue = 0;
 
-    let mut links = Vec::new();
+    let mut links: Vec<Link> = Vec::new();
     let mut link_queue = 0;
+    let mut bakes = Vec::new();
 
     let mut resource_constraints: HashMap<usize, ResourceConstraint> = Default::default(); // token to resourceconstraint
 
-    let mut expand_links_queue: Vec<usize> = Vec::new();
+    let mut expand_links_queue: Vec<(bool, usize)> = Vec::new();
     let mut expand_links_lits: HashMap<Bool, usize> = HashMap::new();
     let mut need_more_links_than = 0;
 
@@ -94,7 +96,7 @@ pub fn solve(problem: &Problem) -> Result<Solution, SolverError> {
             }
         }
 
-         println!("Adding token[{}] {} {} {}", if fact { "fact"} else {"goal"}, tokens.len(), token_spec.timeline_name, token_spec.value);
+        //  println!("Adding token[{}] {} {} {}", if fact { "fact"} else {"goal"}, tokens.len(), token_spec.timeline_name, token_spec.value);
 
         tokens.push(Token {
             timeline_name: &token_spec.timeline_name,
@@ -114,6 +116,8 @@ pub fn solve(problem: &Problem) -> Result<Solution, SolverError> {
 
     // println!("Tokens: {:?}", tokens_by_name);
 
+    let mut core_sizes = Vec::new();
+
     loop {
         // Expand the graph and try to solve
         while token_queue < tokens.len() || !expand_links_queue.is_empty() || link_queue < links.len() {
@@ -122,7 +126,11 @@ pub fn solve(problem: &Problem) -> Result<Solution, SolverError> {
                 let token_idx = token_queue;
                 let token = &tokens[token_idx];
                 token_queue += 1;
-                println!("token idx {}", token_idx);
+                // println!("token idx {}", token_idx);
+
+                if token.value == "Baking" {
+                    bakes.push(token_idx);
+                }
 
                 // Process newly added token:
                 //  - add its internal constraints (duration limits), and
@@ -142,8 +150,17 @@ pub fn solve(problem: &Problem) -> Result<Solution, SolverError> {
                     continue;
                 }
 
+                if !timelines_by_name.contains_key(token.timeline_name)
+                    || !problem.timelines[timelines_by_name[token.timeline_name]]
+                        .states
+                        .iter()
+                        .any(|s| s.name == token.value)
+                {
+                    panic!("Shouldn't have added this state.");
+                }
+
                 // let timeline_name = problem.timelines[token.timeline_idx].name.as_str();
-                println!("Looking up {}.{}",token.timeline_name,token.value);
+                // println!("Looking up {}.{}",token.timeline_name,token.value);
                 let timeline_idx = timelines_by_name[token.timeline_name];
                 if let Some(state) = problem.timelines[timeline_idx]
                     .states
@@ -152,6 +169,14 @@ pub fn solve(problem: &Problem) -> Result<Solution, SolverError> {
                 {
                     resource_constraints.entry(token_idx).or_default().capacity = Some(state.capacity);
                     // println!("Token {} {}", token.timeline_name, token.value);
+
+                    // If there are old links pointing to this value, we need to update them.
+                    // println!("Adding links for {}.{}", token.timeline_name, token.value);
+                    for (link_idx, link) in links.iter().enumerate() {
+                        if link.linkspec.value == token.value {
+                            expand_links_queue.push((false, link_idx));
+                        }
+                    }
 
                     if let Some(end_time) = token.end_time.as_ref() {
                         if let Some(start_time) = token.start_time.as_ref() {
@@ -186,12 +211,12 @@ pub fn solve(problem: &Problem) -> Result<Solution, SolverError> {
                 }
             }
             while !expand_links_queue.is_empty() || link_queue < links.len() {
-                let link_idx = if link_queue < links.len() {
+                let (need_new, link_idx) = if link_queue < links.len() {
                     let link_idx = link_queue;
                     link_queue += 1;
-                    link_idx
+                    (true, link_idx)
                 } else {
-                    println!("Expanding link from expand queue.");
+                    // println!("Expanding link from expand queue.");
                     expand_links_queue.pop().unwrap()
                 };
 
@@ -229,33 +254,8 @@ pub fn solve(problem: &Problem) -> Result<Solution, SolverError> {
                     }
                 }
 
-                let total_multiplicity = objects
-                    .iter()
-                    .map(|o| {
-                        if multiplicity_one.contains(&(o, &link.linkspec.value)) {
-                            1
-                        } else {
-                            2
-                        }
-                    })
-                    .sum::<usize>();
-
-                let old_expansion_lit: Option<Bool> = links[link_idx].alternatives_extension.take();
-
-                if total_multiplicity >= 2 {
-                    let expand_lit = Bool::fresh_const(&ctx, "exp");
-                    expand_links_lits.insert(Bool::not(&expand_lit), link_idx);
-                    links[link_idx].alternatives_extension = Some(expand_lit.clone());
-                    alternatives.push(expand_lit);
-                } else {
-                    // println!(
-                    //     "NO MORE ALTERNATIVES FOR {} {}",
-                    //     problem.timelines[token.timeline_idx].name, token.value
-                    // );
-                }
-
                 let link = &links[link_idx];
-                if new_target_tokens.is_empty() {
+                if need_new && new_target_tokens.is_empty() {
                     // Select a object at random
                     // TODO make a heuristic for this
 
@@ -269,6 +269,16 @@ pub fn solve(problem: &Problem) -> Result<Solution, SolverError> {
                         let obj_name = objects[selected_object];
                         let new_token_idx = tokens.len();
                         //     let token_active = ;
+
+                        if !timelines_by_name.contains_key(obj_name)
+                            || !problem.timelines[timelines_by_name[obj_name]]
+                                .states
+                                .iter()
+                                .any(|s| s.name == link.linkspec.value)
+                        {
+                            // Not possible to create this state (it's probably only used as a fact.)
+                            continue;
+                        }
 
                         // TODO check that multiplicity is not maxed.
                         tokens.push(Token {
@@ -295,68 +305,108 @@ pub fn solve(problem: &Problem) -> Result<Solution, SolverError> {
                         break;
                     }
                 }
-                let token = &tokens[link.token_idx];
 
-                for token_idx in new_target_tokens.iter().copied() {
+                if need_new && new_target_tokens.is_empty() {
                     println!(
-                        "linking value {}.{} {}.{}\n --{:?}",
-                        tokens[token_idx].timeline_name,
-                        tokens[token_idx].value,
-                        token.timeline_name,
-                        token.value,
-                        link.linkspec
+                        "Warning: Could not generate required link extension for {:?}.{}.",
+                        link.linkspec.object, link.linkspec.value
                     );
-
-                    // Represents the usage of the causal link.
-                    let choose_link = Bool::fresh_const(&ctx, "cl");
-
-                    let temporal_rel = match link.linkspec.temporal_relationship {
-                        TemporalRelationship::Meet => vec![Real::_eq(
-                            tokens[token_idx].end_time.as_ref().unwrap(),
-                            token.start_time.as_ref().unwrap(),
-                        )],
-                        TemporalRelationship::Cover => vec![
-                            Real::le(
-                                tokens[token_idx].start_time.as_ref().unwrap(),
-                                token.start_time.as_ref().unwrap(),
-                            ),
-                            Real::le(
-                                token.end_time.as_ref().unwrap(),
-                                tokens[token_idx].end_time.as_ref().unwrap(),
-                            ),
-                        ],
-                    };
-
-                    if link.linkspec.amount > 0 {
-                        println!("Link has amount {:?}", link.linkspec);
-                        // Add resource constraint for this token.
-                        resource_constraints.entry(token_idx).or_default().users.push((
-                            choose_link.clone(),
-                            link.token_idx,
-                            link.linkspec.amount,
-                        ));
-                    }
-
-                    // The choose_link boolean implies all the condntions.
-                    for cond in temporal_rel.iter().chain(std::iter::once(&tokens[token_idx].active)) {
-                        solver.assert(&Bool::implies(&choose_link, cond));
-                    }
-
-                    alternatives.push(choose_link);
                 }
 
-                let need_alternatives = old_expansion_lit.unwrap_or_else(|| tokens[link.token_idx].active.clone());
-                alternatives.push(Bool::not(&need_alternatives));
+                if !new_target_tokens.is_empty() {
+                    let token = &tokens[link.token_idx];
 
-                let alternatives_refs = alternatives.iter().collect::<Vec<_>>();
-                // println!(
-                //     "TOKEN LINKS for {}.{}[{}] has {} alternatives",
-                //     problem.timelines[tokens[link.token_idx].timeline_idx].name,
-                //     tokens[link.token_idx].value,
-                //     link.token_idx,
-                //     alternatives.len()
-                // );
-                solver.assert(&Bool::or(&ctx, &alternatives_refs));
+                    for token_idx in new_target_tokens.iter().copied() {
+                        // println!(
+                        //     "linking value {}.{} {}.{}\n --{:?}",
+                        //     tokens[token_idx].timeline_name,
+                        //     tokens[token_idx].value,
+                        //     token.timeline_name,
+                        //     token.value,
+                        //     link.linkspec
+                        // );
+
+                        // Represents the usage of the causal link.
+                        let choose_link = Bool::fresh_const(&ctx, "cl");
+
+                        let temporal_rel = match link.linkspec.temporal_relationship {
+                            TemporalRelationship::Meet => vec![Real::_eq(
+                                tokens[token_idx].end_time.as_ref().unwrap(),
+                                token.start_time.as_ref().unwrap(),
+                            )],
+                            TemporalRelationship::Cover => vec![
+                                Real::le(
+                                    tokens[token_idx].start_time.as_ref().unwrap(),
+                                    token.start_time.as_ref().unwrap(),
+                                ),
+                                Real::le(
+                                    token.end_time.as_ref().unwrap(),
+                                    tokens[token_idx].end_time.as_ref().unwrap(),
+                                ),
+                            ],
+                        };
+
+                        if link.linkspec.amount > 0 {
+                            // println!("Link has amount {:?}", link.linkspec);
+                            // Add resource constraint for this token.
+                            resource_constraints.entry(token_idx).or_default().users.push((
+                                choose_link.clone(),
+                                link.token_idx,
+                                link.linkspec.amount,
+                            ));
+                        }
+
+                        // The choose_link boolean implies all the condntions.
+                        for cond in temporal_rel.iter().chain(std::iter::once(&tokens[token_idx].active)) {
+                            solver.assert(&Bool::implies(&choose_link, cond));
+                        }
+
+                        alternatives.push(choose_link);
+                    }
+
+                    let total_multiplicity = objects
+                        .iter()
+                        .map(|o| {
+                            if multiplicity_one.contains(&(o, &link.linkspec.value)) {
+                                1
+                            } else {
+                                2
+                            }
+                        })
+                        .sum::<usize>();
+
+                    let old_expansion_lit: Option<Bool> = links[link_idx].alternatives_extension.take();
+
+                    if let Some(b) = old_expansion_lit.as_ref() {
+                        assert!(expand_links_lits.remove(b).is_some());
+                    }
+
+                    if total_multiplicity >= 2 {
+                        let expand_lit = Bool::fresh_const(&ctx, "exp");
+                        assert!(expand_links_lits.insert(expand_lit.clone(), link_idx).is_none());
+                        links[link_idx].alternatives_extension = Some(expand_lit.clone());
+                        alternatives.push(expand_lit);
+                    } else {
+                        // println!(
+                        //     "NO MORE ALTERNATIVES FOR {} {}",
+                        //     problem.timelines[token.timeline_idx].name, token.value
+                        // );
+                    }
+
+                    let need_alternatives =
+                        old_expansion_lit.unwrap_or_else(|| tokens[links[link_idx].token_idx].active.clone());
+                    alternatives.push(Bool::not(&need_alternatives));
+
+                    let alternatives_refs = alternatives.iter().collect::<Vec<_>>();
+                    // println!(
+                    //     "TOKEN LINKS for {}.{}[{}] has {} alternatives",
+                    //     problem.timelines[tokens[link.token_idx].timeline_idx].name,
+                    //     tokens[link.token_idx].value,
+                    //     link.token_idx,
+                    //     alternatives.len()
+                    // );
+                    solver.assert(&Bool::or(&ctx, &alternatives_refs));
+                }
 
                 links[link_idx].token_queue = tokens.len();
             }
@@ -382,13 +432,38 @@ pub fn solve(problem: &Problem) -> Result<Solution, SolverError> {
             if rc.users.len() > rc.integrated {
                 // We need to update the constraint.
 
+                if rc.integrated != 0 {
+                    println!("WARNING: resource constraint users has been extended.");
+                }
+
                 rc.integrated = rc.users.len();
 
                 if !rc.closed {
                     // TODO: make an extension point in the pseudo-boolean constraint for adding more usages later.
                 }
 
+                println!(
+                    "Adding resource constraint for {}.{} with size {} capacity {:?}",
+                    tokens[*_token_idx].timeline_name,
+                    tokens[*_token_idx].value,
+                    rc.users.len(),
+                    rc.capacity
+                );
+
                 // TASK-INDEXED RESOURCE CONSTRAINT
+
+                // for i in 0..rc.users.len() {
+                //     let j0 = if i > rc.integrated {
+                //         0
+                //     } else {
+                //         i+1
+                //     };
+
+                //     for j in j0..rc.users.len() {
+
+                //     }
+                // }
+
                 for (link1, token1, _) in rc.users.iter() {
                     let overlaps = rc
                         .users
@@ -416,12 +491,6 @@ pub fn solve(problem: &Problem) -> Result<Solution, SolverError> {
 
                     let overlaps_refs = overlaps.iter().map(|(o, c)| (o, *c as i32)).collect::<Vec<_>>();
 
-                    println!(
-                        "Adding resource constraint for {}.{} with size {}",
-                        tokens[*_token_idx].timeline_name,
-                        tokens[*_token_idx].value,
-                        overlaps.len()
-                    );
                     solver.assert(&Bool::pb_le(&ctx, &overlaps_refs, rc.capacity.unwrap() as i32));
                 }
             }
@@ -433,31 +502,54 @@ pub fn solve(problem: &Problem) -> Result<Solution, SolverError> {
             return Err(SolverError::NoSolution);
         }
 
-        let assumptions = expand_links_lits.keys().cloned().collect::<Vec<_>>();
-        println!("{}", solver);
+        let expand_links_negated_lits = expand_links_lits
+            .keys()
+            .map(|l| (Bool::not(l), l.clone()))
+            .collect::<HashMap<_, _>>();
+
+        let assumptions = expand_links_negated_lits.keys().cloned().collect::<Vec<_>>();
+        // println!("{}", solver);
         println!(
             "Solving with {} tokens {} causal links {} extension points",
             tokens.len(),
             links.len(),
             assumptions.len()
         );
+        let bakes_str = bakes
+            .iter()
+            .copied()
+            .map(|t| format!("{}.{}", tokens[t].timeline_name, tokens[t].value))
+            .collect::<Vec<_>>();
+        println!("Bakes {}: {:?}", bakes.len(), bakes_str);
         let result = solver.check_assumptions(&assumptions);
         match result {
             z3::SatResult::Unsat => {
-                let core = solver.get_unsat_core();
+                let mut core = solver.get_unsat_core();
                 if core.is_empty() {
                     return Err(SolverError::NoSolution);
                 }
 
-                // println!("CORE {:?}", core);
+                let use_trim_core = false;
+                let use_minimize_core = false;
+
+                if use_trim_core {
+                    crate::cores::trim_core(&mut core, &solver);
+                }
+
+                if use_minimize_core {
+                    crate::cores::minimize_core(&mut core, &solver);
+                }
+
+                core_sizes.push(core.len());
+                println!("CORE SIZE #{}: {:?}", core_sizes.len(), core_sizes);
                 for c in core {
-                    let link_idx = expand_links_lits.remove(&c).unwrap();
+                    let link_idx = expand_links_lits[&expand_links_negated_lits[&c]]; //.remove(&c).unwrap();
                     let link = &links[link_idx];
                     let token = &tokens[link.token_idx];
-                    // println!("  -expand {}.{} {:?}", token.timeline_name, token.value, link.linkspec);
+                    println!("  -expand {}.{} {:?}", token.timeline_name, token.value, link.linkspec);
 
                     // TODO heuristically decide which and how many to expand.s
-                    expand_links_queue.push(link_idx);
+                    expand_links_queue.push((true, link_idx));
                     need_more_links_than = links.len();
                 }
             }
@@ -467,6 +559,10 @@ pub fn solve(problem: &Problem) -> Result<Solution, SolverError> {
 
                 let mut solution_tokens = Vec::new();
                 for v in tokens.iter() {
+                    if !model.eval(&v.active, true).unwrap().as_bool().unwrap() {
+                        continue;
+                    }
+
                     let start_time = v
                         .start_time
                         .as_ref()
@@ -500,6 +596,7 @@ pub fn solve(problem: &Problem) -> Result<Solution, SolverError> {
     }
 }
 
+
 fn from_z3_real(real: &Real) -> f32 {
     let (num, den) = real.as_real().unwrap();
     num as f32 / den as f32
@@ -520,6 +617,10 @@ struct Token<'a, 'z3> {
     value: &'a str,
     active: Bool<'z3>,
     fact: bool,
+}
+
+struct Timeline {
+    
 }
 
 #[derive(Default)]
