@@ -36,12 +36,12 @@ pub enum TokenTime {
 #[derive(Debug)]
 pub struct Timeline {
     pub name :String,
-    pub states :Vec<State>,
+    pub values :Vec<Value>,
 }
 
 #[derive(Debug)]
 #[derive(Serialize, Deserialize)]
-pub struct State {
+pub struct Value {
     pub name :String,
     pub duration :(usize,Option<usize>),
     pub conditions :Vec<Condition>,

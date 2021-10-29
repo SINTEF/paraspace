@@ -82,7 +82,7 @@ pub fn solve(problem: &Problem) -> Result<Solution, SolverError> {
                 .ok_or(SolverError::GoalStateMissing)?;
 
             let state = problem.timelines[timeline_idx]
-                .states
+                .values
                 .iter()
                 .find(|s| s.name == token_spec.value)
                 .ok_or(SolverError::GoalStateMissing)?;
@@ -154,7 +154,7 @@ pub fn solve(problem: &Problem) -> Result<Solution, SolverError> {
 
                 if !timelines_by_name.contains_key(token.timeline_name)
                     || !problem.timelines[timelines_by_name[token.timeline_name]]
-                        .states
+                        .values
                         .iter()
                         .any(|s| s.name == token.value)
                 {
@@ -166,7 +166,7 @@ pub fn solve(problem: &Problem) -> Result<Solution, SolverError> {
 
                 let timeline_idx = timelines_by_name[token.timeline_name];
                 if let Some(state) = problem.timelines[timeline_idx]
-                    .states
+                    .values
                     .iter()
                     .find(|s| s.name == token.value)
                 {
@@ -275,7 +275,7 @@ pub fn solve(problem: &Problem) -> Result<Solution, SolverError> {
 
                         if !timelines_by_name.contains_key(obj_name)
                             || !problem.timelines[timelines_by_name[obj_name]]
-                                .states
+                                .values
                                 .iter()
                                 .any(|s| s.name == link.linkspec.value)
                         {
