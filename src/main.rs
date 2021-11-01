@@ -78,7 +78,7 @@ fn perftest() {
 
         // println!("Problem:\n{:#?}", problem);
         // println!("Solving...");
-        let result = print_calc_time(&problem_name, || tokensolver::solve(&problem));
+        let result = print_calc_time(&problem_name, || transitionsolver::solve(&problem));
         match result {
             Ok(solution) => {
                 // println!("Success!");

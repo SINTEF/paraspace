@@ -4,7 +4,7 @@ use z3::ast::{Ast, Bool, Real};
 
 use crate::{
     from_z3_real,
-    problem::{self, ObjectSet, Problem, Solution, SolutionToken, TemporalRelationship},
+    problem::{self, ObjectSet, Problem, Solution, SolutionToken, TemporalRelationship, TokenTime},
     SolverError,
 };
 
@@ -39,7 +39,7 @@ struct Timeline<'z> {
 }
 
 pub fn solve(problem: &Problem) -> Result<Solution, SolverError> {
-    println!("Starting transition-and-pocl solver.");
+    // println!("Starting transition-and-pocl solver.");
     let z3_config = z3::Config::new();
     let ctx = z3::Context::new(&z3_config);
     let solver = z3::Solver::new(&ctx);
@@ -66,7 +66,7 @@ pub fn solve(problem: &Problem) -> Result<Solution, SolverError> {
     let mut states_queue = 0;
     let mut tokens = Vec::new();
     let mut tokens_queue = 0;
-    let mut conds = Vec::new();
+    let mut conds: Vec<Condition> = Vec::new();
     let mut conds_queue = 0;
 
     let mut goal_lits: HashMap<(&str, isize), Bool> = HashMap::new();
@@ -160,6 +160,8 @@ pub fn solve(problem: &Problem) -> Result<Solution, SolverError> {
         }
     }
 
+    let mut n_smt_calls = 0;
+
     // REFINEMENT LOOP
     '_refinement: loop {
         // EXPAND PROBLEM FORMULATION
@@ -175,51 +177,72 @@ pub fn solve(problem: &Problem) -> Result<Solution, SolverError> {
 
                 // Does this timeline have a goal state?
                 let facts_only = timelines[states[state_idx].timeline].facts_only;
-                println!(
-                    "Expanding state {} timeline {} (factsonly={})",
-                    state_idx, states[state_idx].timeline, facts_only
-                );
+                // println!(
+                //     "Expanding state {} timeline {} (factsonly={})",
+                //     state_idx, states[state_idx].timeline, facts_only
+                // );
 
                 // There are no goals for facts only timelines.
                 if !facts_only {
-                    let timeline_name = problem.timelines[states[state_idx].timeline].name.as_str();
-                    if let Some(goal) = problem
-                        .tokens
-                        .iter()
-                        .find(|const_token| const_token.timeline_name == timeline_name)
-                    {
+                    let timeline_idx = states[state_idx].timeline;
+                    let timeline_name = timeline_names[timeline_idx];
+                    if let Some(goal) = problem.tokens.iter().find(|const_token| {
+                        const_token.timeline_name == timeline_name && matches!(const_token.const_time, TokenTime::Goal)
+                    }) {
                         // Is this a potential final/goal state?
                         if let Some(token_idx) = states[state_idx]
                             .tokens
                             .iter()
                             .find(|t| tokens[**t].value == goal.value)
                         {
-                            let goal_lit = Bool::fresh_const(&ctx, "goal");
-                            if let Some(active) = tokens[*token_idx].active.as_ref() {
-                                solver.assert(&Bool::implies(&goal_lit, active));
+                            let can_expand = {
+                                let timeline = &timelines[timeline_idx];
+                                !timeline.facts_only
+                                    && can_expand(
+                                        &problem.timelines[timeline_idx],
+                                        &states[state_idx]
+                                            .tokens
+                                            .iter()
+                                            .map(|t| tokens[*t].value)
+                                            .collect::<Vec<_>>(),
+                                        &goal.value,
+                                    )
+                            };
+
+                            if can_expand {
+                                let goal_lit = Bool::fresh_const(&ctx, "goal");
+                                if let Some(active) = tokens[*token_idx].active.as_ref() {
+                                    solver.assert(&Bool::implies(&goal_lit, active));
+                                }
+                                assert!(goal_lits
+                                    .insert((timeline_name, states[state_idx].state_seq as isize), goal_lit.clone())
+                                    .is_none());
+
+                                // Select at least one goal (at most one goal is implied by the disabling of tokens below)
+                                let mut clause = Vec::new();
+                                if let Some(prev_extension) = timelines[timelines_by_name[timeline_name]]
+                                    .goal_state_extension
+                                    .as_ref()
+                                {
+                                    assert!(expand_goal_state_lits.remove(prev_extension).is_some());
+                                    clause.push(Bool::not(prev_extension));
+                                }
+                                clause.push(goal_lit);
+
+                                let extension = Bool::fresh_const(&ctx, "addgoal");
+                                clause.push(extension.clone());
+                                expand_goal_state_lits.insert(extension.clone(), timelines_by_name[timeline_name]);
+                                timelines[timelines_by_name[timeline_name]].goal_state_extension = Some(extension);
+
+                                let clause_refs = clause.iter().collect::<Vec<_>>();
+                                solver.assert(&Bool::or(&ctx, &clause_refs));
+                            } else {
+                                // If we can only get to the goal one time, then
+                                // might as well just assert this state.
+                                if let Some(active) = tokens[*token_idx].active.as_ref() {
+                                    solver.assert(active);
+                                }
                             }
-                            assert!(goal_lits
-                                .insert((timeline_name, states[state_idx].state_seq as isize), goal_lit.clone())
-                                .is_none());
-
-                            // Select at least one goal (at most one goal is implied by the disabling of tokens below)
-                            let mut clause = Vec::new();
-                            if let Some(prev_extension) = timelines[timelines_by_name[timeline_name]]
-                                .goal_state_extension
-                                .as_ref()
-                            {
-                                assert!(expand_goal_state_lits.remove(prev_extension).is_some());
-                                clause.push(Bool::not(prev_extension));
-                            }
-                            clause.push(goal_lit);
-
-                            let extension = Bool::fresh_const(&ctx, "addgoal");
-                            clause.push(extension.clone());
-                            expand_goal_state_lits.insert(extension.clone(), timelines_by_name[timeline_name]);
-                            timelines[timelines_by_name[timeline_name]].goal_state_extension = Some(extension);
-
-                            let clause_refs = clause.iter().collect::<Vec<_>>();
-                            solver.assert(&Bool::or(&ctx, &clause_refs));
                         }
                     }
 
@@ -262,6 +285,14 @@ pub fn solve(problem: &Problem) -> Result<Solution, SolverError> {
                         .unwrap();
 
                     resource_constraints.entry(token_idx).or_default().capacity = Some(value_spec.capacity);
+
+                    // If there are old links pointing to this value, we need to update them.
+                    // println!("Adding links for {}.{}", token.timeline_name, token.value);
+                    for (cond_idx, cond) in conds.iter().enumerate() {
+                        if cond.cond_spec.value == tokens[token_idx].value {
+                            expand_links_queue.push((false, cond_idx));
+                        }
+                    }
 
                     // Minimum duration of state.
                     let prec = &Real::le(
@@ -339,10 +370,10 @@ pub fn solve(problem: &Problem) -> Result<Solution, SolverError> {
                                     solver.assert(&Bool::or(&ctx, &clause_refs));
                                 }
                             } else {
-                                println!(
-                                    "No transition condition for initial state for {}",
-                                    &problem.timelines[states[tokens[token_idx].state].timeline].name
-                                );
+                                // println!(
+                                //     "No transition condition for initial state for {}",
+                                //     &problem.timelines[states[tokens[token_idx].state].timeline].name
+                                // );
                             }
                         } else {
                             // When it's not a timeline transition, make a causal link.
@@ -378,10 +409,10 @@ pub fn solve(problem: &Problem) -> Result<Solution, SolverError> {
                 };
 
                 // let mut all_target_tokens = Vec::new();
-                println!("Finding tokens for object set {:?}", &conds[cond_idx].cond_spec.object);
+                // println!("Finding tokens for object set {:?}", &conds[cond_idx].cond_spec.object);
                 let mut new_target_tokens = Vec::new();
                 for obj in objects.iter() {
-                    println!("Finding tokens for {}.{}", obj, conds[cond_idx].cond_spec.value);
+                    // println!("Finding tokens for {}.{}", obj, conds[cond_idx].cond_spec.value);
                     let timeline_idx = timelines_by_name[obj];
                     let matching_tokens = tokens.iter().enumerate().filter(|(_, t)| {
                         states[t.state].timeline == timeline_idx && t.value == conds[cond_idx].cond_spec.value
@@ -390,6 +421,7 @@ pub fn solve(problem: &Problem) -> Result<Solution, SolverError> {
                         // all_target_tokens.push(token);
 
                         if token >= conds[cond_idx].token_queue {
+                            // println!("  new token {:?}", tokens[token].value);
                             new_target_tokens.push(token);
                         }
                     }
@@ -401,10 +433,10 @@ pub fn solve(problem: &Problem) -> Result<Solution, SolverError> {
                         let selected_object = (tokens.len() + conds.len() + i) % objects.len();
                         let obj_name = objects[selected_object];
 
-                        println!(
-                            "Finding new states to add to get to {}.{}",
-                            obj_name, conds[cond_idx].cond_spec.value
-                        );
+                        // println!(
+                        //     "Finding new states to add to get to {}.{}",
+                        //     obj_name, conds[cond_idx].cond_spec.value
+                        // );
 
                         let prev_tokens_len = tokens.len();
                         if expand_until(
@@ -433,9 +465,9 @@ pub fn solve(problem: &Problem) -> Result<Solution, SolverError> {
                                         .unwrap(),
                             );
 
-                            println!("Added token {:?}", new_target_tokens.last());
-                            let token = &tokens[*new_target_tokens.last().unwrap()];
-                            println!("  token state {:?} value {:?}", token.state, token.value);
+                            // println!("Added token {:?}", new_target_tokens.last());
+                            // let token = &tokens[*new_target_tokens.last().unwrap()];
+                            // println!("  token state {:?} value {:?}", token.state, token.value);
 
                             // println!("Expanded transitions for this timeline, restarting refinement.");
                             // continue 'refinement;
@@ -501,10 +533,30 @@ pub fn solve(problem: &Problem) -> Result<Solution, SolverError> {
                         assert!(expand_links_lits.remove(b).is_some());
                     }
 
-                    let expand_lit = Bool::fresh_const(&ctx, "exp");
-                    assert!(expand_links_lits.insert(expand_lit.clone(), cond_idx).is_none());
-                    conds[cond_idx].alternatives_extension = Some(expand_lit.clone());
-                    alternatives.push(expand_lit);
+                    let can_expand = objects.iter().any(|t| {
+                        let idx = timelines_by_name[t];
+                        let timeline = &timelines[idx];
+
+                        !timeline.facts_only
+                            && can_expand(
+                                &problem.timelines[idx],
+                                &states[*timeline.states.last().unwrap()]
+                                    .tokens
+                                    .iter()
+                                    .map(|t| tokens[*t].value)
+                                    .collect::<Vec<_>>(),
+                                &conds[cond_idx].cond_spec.value,
+                            )
+                    });
+
+                    // println!("{:?}.{} can_expand={}", objects, &conds[cond_idx].cond_spec.value, can_expand);
+
+                    if can_expand {
+                        let expand_lit = Bool::fresh_const(&ctx, "exp");
+                        assert!(expand_links_lits.insert(expand_lit.clone(), cond_idx).is_none());
+                        conds[cond_idx].alternatives_extension = Some(expand_lit.clone());
+                        alternatives.push(expand_lit);
+                    }
 
                     let need_alternatives =
                         old_expansion_lit.or_else(|| tokens[conds[cond_idx].token_idx].active.clone());
@@ -513,13 +565,13 @@ pub fn solve(problem: &Problem) -> Result<Solution, SolverError> {
                         alternatives.push(Bool::not(&cond));
                     }
 
-                    println!(
-                        "TOKEN LINKS for {}.{}[{}] has {} alternatives",
-                        timeline_names[states[tokens[conds[cond_idx].token_idx].state].timeline],
-                        tokens[conds[cond_idx].token_idx].value,
-                        conds[cond_idx].token_idx,
-                        alternatives.len()
-                    );
+                    // println!(
+                    //     "TOKEN LINKS for {}.{}[{}] has {} alternatives",
+                    //     timeline_names[states[tokens[conds[cond_idx].token_idx].state].timeline],
+                    //     tokens[conds[cond_idx].token_idx].value,
+                    //     conds[cond_idx].token_idx,
+                    //     alternatives.len()
+                    // );
 
                     let alternatives_refs = alternatives.iter().collect::<Vec<_>>();
                     solver.assert(&Bool::or(&ctx, &alternatives_refs));
@@ -539,10 +591,10 @@ pub fn solve(problem: &Problem) -> Result<Solution, SolverError> {
                         .iter()
                         .any(|t| tokens[*t].value == const_token.value);
                     if !has_goal {
-                        println!(
-                            "Timeline {} has no final goal state. Adding.",
-                            const_token.timeline_name
-                        );
+                        // println!(
+                        //     "Timeline {} has no final goal state. Adding.",
+                        //     const_token.timeline_name
+                        // );
                         let expanded = expand_until(
                             problem,
                             &ctx,
@@ -565,7 +617,7 @@ pub fn solve(problem: &Problem) -> Result<Solution, SolverError> {
                 // We need to update the constraint.
 
                 if rc.integrated != 0 {
-                    println!("WARNING: resource constraint users has been extended.");
+                    // println!("WARNING: resource constraint users has been extended.");
                 }
 
                 rc.integrated = rc.users.len();
@@ -574,13 +626,13 @@ pub fn solve(problem: &Problem) -> Result<Solution, SolverError> {
                     // TODO: make an extension point in the pseudo-boolean constraint for adding more usages later.
                 }
 
-                println!(
-                    "Adding resource constraint for {}.{} with size {} capacity {:?}",
-                    timeline_names[states[tokens[*_token_idx].state].timeline],
-                    tokens[*_token_idx].value,
-                    rc.users.len(),
-                    rc.capacity
-                );
+                // println!(
+                //     "Adding resource constraint for {}.{} with size {} capacity {:?}",
+                //     timeline_names[states[tokens[*_token_idx].state].timeline],
+                //     tokens[*_token_idx].value,
+                //     rc.users.len(),
+                //     rc.capacity
+                // );
 
                 // TASK-INDEXED RESOURCE CONSTRAINT
 
@@ -647,6 +699,10 @@ pub fn solve(problem: &Problem) -> Result<Solution, SolverError> {
             .map(|l| (Bool::not(l), l.clone()))
             .collect::<HashMap<_, _>>();
 
+        // for (i, timeline) in timelines.iter().enumerate() {
+        //     println!("Timeline {} has {} states", timeline_names[i], timeline.states.len());
+        // }
+
         println!(
             "Solving with {} timelines {} states {} tokens {} conditions {} goal_exp {} link_exp",
             timelines.len(),
@@ -657,6 +713,7 @@ pub fn solve(problem: &Problem) -> Result<Solution, SolverError> {
             expand_links_lits.len()
         );
 
+        n_smt_calls += 1;
         let result = solver.check_assumptions(&neg_expansions.keys().cloned().collect::<Vec<_>>());
         match result {
             z3::SatResult::Unsat => {
@@ -677,24 +734,24 @@ pub fn solve(problem: &Problem) -> Result<Solution, SolverError> {
                 // }
 
                 // core_sizes.push(core.len());
-                println!("CORE SIZE #{}", core.len());
+                // println!("CORE SIZE #{}", core.len());
                 for c in core {
                     if let Some(nc) = neg_expansions.get(&c) {
-                        if let Some(timeline) = expand_goal_state_lits.get(nc) {
-                            println!("Expand goals in timleine {}", problem.timelines[*timeline].name);
-                            println!(
-                                "  -expand GOALs for {}",
-                                // problem.timelines[states[token.state].timeline].name, token.value, cond.cond_spec
-                                timeline_names[*timeline]
-                            );
+                        if let Some(_timeline) = expand_goal_state_lits.get(nc) {
+                            // println!("Expand goals in timleine {}", problem.timelines[*timeline].name);
+                            // println!(
+                            //     "  -expand GOALs for {}",
+                            //     // problem.timelines[states[token.state].timeline].name, token.value, cond.cond_spec
+                            //     timeline_names[*timeline]
+                            // );
                             // todo!()
                         } else if let Some(cond_idx) = expand_links_lits.get(nc).copied() {
-                            let cond = &conds[cond_idx];
-                            let token = &tokens[cond.token_idx];
-                            println!(
-                                "  -expand LINK {}.{} {:?}",
-                                problem.timelines[states[token.state].timeline].name, token.value, cond.cond_spec
-                            );
+                            // let cond = &conds[cond_idx];
+                            // let token = &tokens[cond.token_idx];
+                            // println!(
+                            //     "  -expand LINK {}.{} {:?}",
+                            //     problem.timelines[states[token.state].timeline].name, token.value, cond.cond_spec
+                            // );
 
                             // TODO heuristically decide which and how many to expand.s
                             expand_links_queue.push((true, cond_idx));
@@ -709,7 +766,7 @@ pub fn solve(problem: &Problem) -> Result<Solution, SolverError> {
             }
 
             z3::SatResult::Sat => {
-                println!("SAT");
+                println!("SAT after {} solver calls", n_smt_calls);
                 let model = solver.get_model().unwrap();
 
                 let mut solution_tokens = Vec::new();
@@ -721,14 +778,14 @@ pub fn solve(problem: &Problem) -> Result<Solution, SolverError> {
                         .unwrap_or(true);
 
                     if !active {
-                        println!("token {} ({:?}) not active", v.value, v.active);
+                        // println!("token {} ({:?}) not active", v.value, v.active);
                         continue;
                     }
 
                     let start_time = from_z3_real(&model.eval(&states[v.state].start_time, true).unwrap());
                     let end_time = from_z3_real(&model.eval(&states[v.state].end_time, true).unwrap());
 
-                    println!("value {:?}", v.value);
+                    // println!("value {:?}", v.value);
 
                     solution_tokens.push(SolutionToken {
                         object_name: timeline_names[states[v.state].timeline].to_string(),
@@ -866,6 +923,10 @@ fn next_values_from<'a>(timeline: &'a problem::Timeline, prev_values: Option<&[&
     }
 
     next_values
+}
+
+fn can_expand(timeline: &problem::Timeline, start_values: &[&str], goal_value: &str) -> bool {
+    distance_to(timeline, start_values, goal_value).is_some()
 }
 
 fn distance_to(timeline: &problem::Timeline, start_values: &[&str], goal_value: &str) -> Option<usize> {

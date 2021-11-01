@@ -1,7 +1,6 @@
 use crate::{SolverError, from_z3_real};
 use z3::ast::Ast;
 use z3::ast::{Bool, Real};
-use z3::SatResult;
 
 use crate::{multiplicity::multiplicity_one, problem::*};
 use std::collections::HashMap;
@@ -203,7 +202,6 @@ pub fn solve(problem: &Problem) -> Result<Solution, SolverError> {
                         links.push(Link {
                             token_idx,
                             linkspec: condition,
-                            alternatives: Vec::new(),
                             alternatives_extension: None,
                             token_queue: 0,
                         });
@@ -533,6 +531,7 @@ pub fn solve(problem: &Problem) -> Result<Solution, SolverError> {
         let result = solver.check_assumptions(&assumptions);
         match result {
             z3::SatResult::Unsat => {
+                #[allow(unused_mut)]
                 let mut core = solver.get_unsat_core();
                 if core.is_empty() {
                     return Err(SolverError::NoSolution);
@@ -610,7 +609,6 @@ struct Link<'a, 'z3> {
     token_idx: usize,
     linkspec: &'a Condition,
     token_queue: usize,
-    alternatives: Vec<(usize, Bool<'z3>)>,
     alternatives_extension: Option<Bool<'z3>>,
 }
 
@@ -623,9 +621,6 @@ struct Token<'a, 'z3> {
     fact: bool,
 }
 
-struct Timeline {
-    
-}
 
 #[derive(Default)]
 struct ResourceConstraint<'z3> {
