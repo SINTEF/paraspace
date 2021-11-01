@@ -76,6 +76,8 @@ pub fn solve(problem: &Problem) -> Result<Solution, SolverError> {
     let mut expand_links_lits: HashMap<Bool, usize> = HashMap::new();
     let mut expand_goal_state_lits: HashMap<Bool, usize> = HashMap::new();
 
+    let mut resource_constraints: HashMap<usize, ResourceConstraint> = Default::default(); // token to resourceconstraint
+
     let mut timelines_by_name = problem
         .timelines
         .iter()
@@ -96,7 +98,7 @@ pub fn solve(problem: &Problem) -> Result<Solution, SolverError> {
                 facts_only: true,
             });
 
-            assert!(timeline_names  .len() == timelines.len());
+            assert!(timeline_names.len() == timelines.len());
             assert!(timelines_by_name.len() == timelines.len());
         }
     }
@@ -133,6 +135,9 @@ pub fn solve(problem: &Problem) -> Result<Solution, SolverError> {
             timelines[timelines_by_name[const_token.timeline_name.as_str()]]
                 .states
                 .push(state_idx);
+
+            // Facts can have capacities
+            resource_constraints.entry(token_idx).or_default().capacity = Some(const_token.capacity);
         }
     }
 
@@ -210,7 +215,7 @@ pub fn solve(problem: &Problem) -> Result<Solution, SolverError> {
 
                             let extension = Bool::fresh_const(&ctx, "addgoal");
                             clause.push(extension.clone());
-                            expand_goal_state_lits.insert(Bool::not(&extension), timelines_by_name[timeline_name]);
+                            expand_goal_state_lits.insert(extension.clone(), timelines_by_name[timeline_name]);
                             timelines[timelines_by_name[timeline_name]].goal_state_extension = Some(extension);
 
                             let clause_refs = clause.iter().collect::<Vec<_>>();
@@ -243,7 +248,7 @@ pub fn solve(problem: &Problem) -> Result<Solution, SolverError> {
                             &ctx,
                             &[
                                 &states[tokens[token_idx].state].start_time,
-                                &Real::from_real(&ctx, 1 as i32, 1),
+                                &Real::from_real(&ctx, 1_i32, 1),
                             ],
                         ),
                         &states[tokens[token_idx].state].end_time,
@@ -255,6 +260,8 @@ pub fn solve(problem: &Problem) -> Result<Solution, SolverError> {
                         .iter()
                         .find(|s| s.name == tokens[token_idx].value)
                         .unwrap();
+
+                    resource_constraints.entry(token_idx).or_default().capacity = Some(value_spec.capacity);
 
                     // Minimum duration of state.
                     let prec = &Real::le(
@@ -446,20 +453,15 @@ pub fn solve(problem: &Problem) -> Result<Solution, SolverError> {
                         };
 
                         if conds[cond_idx].cond_spec.amount > 0 {
-                            println!("TODO Link has amount {:?}", conds[cond_idx].cond_spec);
-
-                            // TODO
-
-                            // // Add resource constraint for this token.
-                            // let rc = resource_constraints.entry(token_idx).or_default();
-                            // assert!(!rc.closed);
-                            // rc.users
-                            //     .push((choose_link.clone(), link.token_idx, link.linkspec.amount));
+                            let rc = resource_constraints.entry(token_idx).or_default();
+                            assert!(!rc.closed);
+                            rc.users
+                                .push((choose_link.clone(), conds[cond_idx].token_idx, conds[cond_idx].cond_spec.amount));
                         }
 
                         // The choose_link boolean implies all the condntions.
                         let mut clause = temporal_rel;
-                        if let Some(active) = tokens[conds[cond_idx].token_idx].active.as_ref() {
+                        if let Some(active) = tokens[token_idx].active.as_ref() {
                             clause.push(active.clone());
                         }
 
@@ -481,13 +483,20 @@ pub fn solve(problem: &Problem) -> Result<Solution, SolverError> {
                     conds[cond_idx].alternatives_extension = Some(expand_lit.clone());
                     alternatives.push(expand_lit);
 
-
                     let need_alternatives =
                         old_expansion_lit.or_else(|| tokens[conds[cond_idx].token_idx].active.clone());
 
                     if let Some(cond) = need_alternatives {
                         alternatives.push(Bool::not(&cond));
                     }
+
+                    println!(
+                        "TOKEN LINKS for {}.{}[{}] has {} alternatives",
+                        timeline_names[states[tokens[conds[cond_idx].token_idx].state].timeline],
+                        tokens[conds[cond_idx].token_idx].value,
+                        conds[cond_idx].token_idx,
+                        alternatives.len()
+                    );
 
                     let alternatives_refs = alternatives.iter().collect::<Vec<_>>();
                     solver.assert(&Bool::or(&ctx, &alternatives_refs));
@@ -527,6 +536,82 @@ pub fn solve(problem: &Problem) -> Result<Solution, SolverError> {
                 }
             }
         }
+
+        for (_token_idx, rc) in resource_constraints.iter_mut() {
+            if rc.users.len() > rc.integrated {
+                // We need to update the constraint.
+
+                if rc.integrated != 0 {
+                    println!("WARNING: resource constraint users has been extended.");
+                }
+
+                rc.integrated = rc.users.len();
+
+                if !rc.closed {
+                    // TODO: make an extension point in the pseudo-boolean constraint for adding more usages later.
+                }
+
+                println!(
+                    "Adding resource constraint for {}.{} with size {} capacity {:?}",
+                    timeline_names[states[tokens[*_token_idx].state].timeline],
+                    tokens[*_token_idx].value,
+                    rc.users.len(),
+                    rc.capacity
+                );
+
+                // TASK-INDEXED RESOURCE CONSTRAINT
+
+                // for i in 0..rc.users.len() {
+                //     let j0 = if i > rc.integrated {
+                //         0
+                //     } else {
+                //         i+1
+                //     };
+
+                //     for j in j0..rc.users.len() {
+
+                //     }
+                // }
+
+                for (link1, token1, _) in rc.users.iter() {
+                    let overlaps = rc
+                        .users
+                        .iter()
+                        .map(|(link2, token2, amount2)| {
+                            let overlap = Bool::and(
+                                &ctx,
+                                &[
+                                    link1,
+                                    link2,
+                                    &Real::lt(
+                                        &states[tokens[*token1].state].start_time,
+                                        &states[tokens[*token2].state].end_time,
+                                    ),
+                                    &Real::lt(
+                                        &states[tokens[*token2].state].start_time,
+                                        &states[tokens[*token1].state].end_time,
+                                    ),
+                                ],
+                            );
+
+                            (overlap, *amount2)
+                        })
+                        .collect::<Vec<_>>();
+
+                    let overlaps_refs = overlaps.iter().map(|(o, c)| (o, *c as i32)).collect::<Vec<_>>();
+
+                    // println!(
+                    //     "Adding resource constraint for {}.{} with size {}",
+                    //     tokens[*_token_idx].timeline_name,
+                    //     tokens[*_token_idx].value,
+                    //     overlaps.len()
+                    // );
+                    solver.assert(&Bool::pb_le(&ctx, &overlaps_refs, rc.capacity.unwrap() as i32));
+                }
+            }
+        }
+
+
 
         // Now we have refined the problem enough for a potential solution to come from solving the SMT.
         // Will call the SMT solver with a list of assumptions that negate all the extension literals.
@@ -610,6 +695,7 @@ pub fn solve(problem: &Problem) -> Result<Solution, SolverError> {
                         .unwrap_or(true);
 
                     if !active {
+                        println!("token {} ({:?}) not active", v.value, v.active);
                         continue;
                     }
 
@@ -788,4 +874,12 @@ fn distance_to(timeline: &problem::Timeline, start_values: &[&str], goal_value: 
         current_values = next_values;
         steps += 1;
     }
+}
+
+#[derive(Default)]
+struct ResourceConstraint<'z3> {
+    capacity: Option<u32>,
+    users: Vec<(Bool<'z3>, usize, u32)>,
+    integrated: usize,
+    closed: bool,
 }
