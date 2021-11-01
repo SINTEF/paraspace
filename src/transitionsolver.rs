@@ -280,6 +280,26 @@ pub fn solve(problem: &Problem) -> Result<Solution, SolverError> {
                         solver.assert(prec);
                     }
 
+                    // Maximum duration
+                    if let Some(max_dur) = value_spec.duration.1 {
+                        let prec = &Real::ge(
+                            &Real::add(
+                                &ctx,
+                                &[
+                                    &states[tokens[token_idx].state].start_time,
+                                    &Real::from_real(&ctx, max_dur as i32, 1),
+                                ],
+                            ),
+                            &states[tokens[token_idx].state].end_time,
+                        );
+
+                        if let Some(cond) = tokens[token_idx].active.as_ref() {
+                            solver.assert(&Bool::implies(cond, prec))
+                        } else {
+                            solver.assert(prec);
+                        }
+                    }
+
                     for cond_spec in value_spec.conditions.iter() {
                         // is this a timeline transition?
                         if cond_spec
@@ -455,8 +475,11 @@ pub fn solve(problem: &Problem) -> Result<Solution, SolverError> {
                         if conds[cond_idx].cond_spec.amount > 0 {
                             let rc = resource_constraints.entry(token_idx).or_default();
                             assert!(!rc.closed);
-                            rc.users
-                                .push((choose_link.clone(), conds[cond_idx].token_idx, conds[cond_idx].cond_spec.amount));
+                            rc.users.push((
+                                choose_link.clone(),
+                                conds[cond_idx].token_idx,
+                                conds[cond_idx].cond_spec.amount,
+                            ));
                         }
 
                         // The choose_link boolean implies all the condntions.
@@ -611,8 +634,6 @@ pub fn solve(problem: &Problem) -> Result<Solution, SolverError> {
             }
         }
 
-
-
         // Now we have refined the problem enough for a potential solution to come from solving the SMT.
         // Will call the SMT solver with a list of assumptions that negate all the extension literals.
         // Extensions are:
@@ -661,12 +682,17 @@ pub fn solve(problem: &Problem) -> Result<Solution, SolverError> {
                     if let Some(nc) = neg_expansions.get(&c) {
                         if let Some(timeline) = expand_goal_state_lits.get(nc) {
                             println!("Expand goals in timleine {}", problem.timelines[*timeline].name);
-                            todo!()
-                        } else if let Some(cond_idx) = expand_links_lits.get(&c).copied() {
+                            println!(
+                                "  -expand GOALs for {}",
+                                // problem.timelines[states[token.state].timeline].name, token.value, cond.cond_spec
+                                timeline_names[*timeline]
+                            );
+                            // todo!()
+                        } else if let Some(cond_idx) = expand_links_lits.get(nc).copied() {
                             let cond = &conds[cond_idx];
                             let token = &tokens[cond.token_idx];
                             println!(
-                                "  -expand {}.{} {:?}",
+                                "  -expand LINK {}.{} {:?}",
                                 problem.timelines[states[token.state].timeline].name, token.value, cond.cond_spec
                             );
 
@@ -674,10 +700,10 @@ pub fn solve(problem: &Problem) -> Result<Solution, SolverError> {
                             expand_links_queue.push((true, cond_idx));
                             // need_more_links_than = links.len();
                         } else {
-                            panic!("unexpected core lit");
+                            panic!("didn't find positive core lit");
                         }
                     } else {
-                        panic!("unexpected core lit");
+                        panic!("didn't find negated core lit");
                     }
                 }
             }
