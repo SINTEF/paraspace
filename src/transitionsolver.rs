@@ -257,6 +257,49 @@ pub fn solve(problem: &Problem) -> Result<Solution, SolverError> {
                             }
                         }
                     }
+
+                    // Does the previous state have forward transition conditions?
+                    if states[state_idx].state_seq > 0 {
+                        let prev_state_idx =
+                            timelines[states[state_idx].timeline].states[states[state_idx].state_seq - 1];
+
+                        for source_token_idx in states[prev_state_idx].tokens.iter().copied() {
+                            if let Some(value_spec) = problem.timelines[states[tokens[source_token_idx].state].timeline]
+                                .values
+                                .iter()
+                                .find(|s| s.name == tokens[source_token_idx].value)
+                            {
+                                for cond in value_spec.conditions.iter() {
+                                    if let Some(next_value) = cond.is_timeline_transition_to(
+                                        &problem.timelines[states[tokens[source_token_idx].state].timeline].name,
+                                    ) {
+                                        // If token from preivous state is active...
+
+                                        let mut clause = Vec::new();
+                                        if let Some(active) = tokens[source_token_idx].active.as_ref() {
+                                            clause.push(Bool::not(active));
+                                        }
+
+                                        // ... then the current state must have the given value.
+                                        let goal_token_idx = states[state_idx]
+                                            .tokens
+                                            .iter()
+                                            .find(|t| tokens[**t].value == next_value)
+                                            .unwrap();
+
+                                        if let Some(active) = tokens[*goal_token_idx].active.as_ref() {
+                                            clause.push(active.clone());
+                                        }
+
+                                        if !clause.is_empty() {
+                                            let clause_refs = clause.iter().collect::<Vec<_>>();
+                                            solver.assert(&Bool::or(&ctx, &clause_refs));
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
             }
 
@@ -278,6 +321,7 @@ pub fn solve(problem: &Problem) -> Result<Solution, SolverError> {
                     );
                     solver.assert(prec);
                 } else {
+                    // println!("EXPANDING TOKEN {}.{}", timeline_names[states[tokens[token_idx].state].timeline], tokens[token_idx].value);
                     let value_spec = problem.timelines[states[tokens[token_idx].state].timeline]
                         .values
                         .iter()
@@ -334,7 +378,10 @@ pub fn solve(problem: &Problem) -> Result<Solution, SolverError> {
                     for cond_spec in value_spec.conditions.iter() {
                         // is this a timeline transition?
                         if cond_spec
-                            .is_timeline_transition(&problem.timelines[states[tokens[token_idx].state].timeline].name)
+                            .is_timeline_transition_from(
+                                &problem.timelines[states[tokens[token_idx].state].timeline].name,
+                            )
+                            .is_some()
                         {
                             if states[tokens[token_idx].state].state_seq > 0 {
                                 let prev_state_seq = states[tokens[token_idx].state].state_seq - 1;
@@ -375,6 +422,13 @@ pub fn solve(problem: &Problem) -> Result<Solution, SolverError> {
                                 //     &problem.timelines[states[tokens[token_idx].state].timeline].name
                                 // );
                             }
+                        } else if cond_spec
+                            .is_timeline_transition_to(
+                                &problem.timelines[states[tokens[token_idx].state].timeline].name,
+                            )
+                            .is_some()
+                        {
+                            // Pass, this is handled when adding the next state.
                         } else {
                             // When it's not a timeline transition, make a causal link.
                             conds.push(Condition {
@@ -412,7 +466,7 @@ pub fn solve(problem: &Problem) -> Result<Solution, SolverError> {
                 // println!("Finding tokens for object set {:?}", &conds[cond_idx].cond_spec.object);
                 let mut new_target_tokens = Vec::new();
                 for obj in objects.iter() {
-                    // println!("Finding tokens for {}.{}", obj, conds[cond_idx].cond_spec.value);
+                    println!("Finding tokens for {}.{}", obj, conds[cond_idx].cond_spec.value);
                     let timeline_idx = timelines_by_name[obj];
                     let matching_tokens = tokens.iter().enumerate().filter(|(_, t)| {
                         states[t.state].timeline == timeline_idx && t.value == conds[cond_idx].cond_spec.value
@@ -433,10 +487,10 @@ pub fn solve(problem: &Problem) -> Result<Solution, SolverError> {
                         let selected_object = (tokens.len() + conds.len() + i) % objects.len();
                         let obj_name = objects[selected_object];
 
-                        // println!(
-                        //     "Finding new states to add to get to {}.{}",
-                        //     obj_name, conds[cond_idx].cond_spec.value
-                        // );
+                        println!(
+                            "Finding new states to add to get to {}.{}",
+                            obj_name, conds[cond_idx].cond_spec.value
+                        );
 
                         let prev_tokens_len = tokens.len();
                         if expand_until(
@@ -465,13 +519,13 @@ pub fn solve(problem: &Problem) -> Result<Solution, SolverError> {
                                         .unwrap(),
                             );
 
-                            // println!("Added token {:?}", new_target_tokens.last());
-                            // let token = &tokens[*new_target_tokens.last().unwrap()];
-                            // println!("  token state {:?} value {:?}", token.state, token.value);
+                            println!("Added token {:?}", new_target_tokens.last());
+                            let token = &tokens[*new_target_tokens.last().unwrap()];
+                            println!("  token state {:?} value {:?}", token.state, token.value);
 
-                            // println!("Expanded transitions for this timeline, restarting refinement.");
-                            // continue 'refinement;
                             break;
+                        } else {
+                            println!("Could not expand.");
                         }
                     }
                 }
@@ -488,7 +542,7 @@ pub fn solve(problem: &Problem) -> Result<Solution, SolverError> {
                         let choose_link = Bool::fresh_const(&ctx, "cl");
 
                         let temporal_rel = match conds[cond_idx].cond_spec.temporal_relationship {
-                            TemporalRelationship::Meet => vec![Real::_eq(
+                            TemporalRelationship::MetBy => vec![Real::_eq(
                                 &states[tokens[token_idx].state].end_time,
                                 &states[tokens[conds[cond_idx].token_idx].state].start_time,
                             )],
@@ -502,6 +556,10 @@ pub fn solve(problem: &Problem) -> Result<Solution, SolverError> {
                                     &states[tokens[token_idx].state].end_time,
                                 ),
                             ],
+                            TemporalRelationship::Meets => vec![Real::_eq(
+                                &states[tokens[token_idx].state].start_time,
+                                &states[tokens[conds[cond_idx].token_idx].state].end_time,
+                            )],
                         };
 
                         if conds[cond_idx].cond_spec.amount > 0 {
@@ -675,12 +733,12 @@ pub fn solve(problem: &Problem) -> Result<Solution, SolverError> {
 
                     let overlaps_refs = overlaps.iter().map(|(o, c)| (o, *c as i32)).collect::<Vec<_>>();
 
-                    // println!(
-                    //     "Adding resource constraint for {}.{} with size {}",
-                    //     tokens[*_token_idx].timeline_name,
-                    //     tokens[*_token_idx].value,
-                    //     overlaps.len()
-                    // );
+                    println!(
+                        "Adding resource constraint for {}.{} with size {}",
+                        timeline_names[states[tokens[*_token_idx].state].timeline],
+                        tokens[*_token_idx].value,
+                        overlaps.len()
+                    );
                     solver.assert(&Bool::pb_le(&ctx, &overlaps_refs, rc.capacity.unwrap() as i32));
                 }
             }
@@ -795,6 +853,21 @@ pub fn solve(problem: &Problem) -> Result<Solution, SolverError> {
                     })
                 }
 
+                for tl in 0..timelines.len() {
+                    println!("Timeline {}", timeline_names[tl]);
+                    for state in timelines[tl].states.iter().copied() {
+                        println!("  State #{}", state);
+                        for token in states[state].tokens.iter().copied() {
+                            let active = tokens[token]
+                                .active
+                                .as_ref()
+                                .map(|a| model.eval(a, true).unwrap().as_bool().unwrap());
+
+                            println!("    Token {}: {:?}", tokens[token].value, active);
+                        }
+                    }
+                }
+
                 // println!("SOLUTION {:#?}", timelines);
 
                 return Ok(Solution {
@@ -854,6 +927,8 @@ fn expand_until<'a, 'z>(
         let token_start_idx = tokens.len();
         let values = next_values_from(&problem.timelines[timeline_idx], values.as_deref());
 
+        // println!("adding tl:{} state:{} values{}", problem.timelines[timeline_idx].name, state_seq, )
+
         let state_tokens = values
             .into_iter()
             .map(|value| Token {
@@ -875,6 +950,32 @@ fn expand_until<'a, 'z>(
             .filter_map(|t| t.active.as_ref().map(|b| (b, 1)))
             .collect::<Vec<_>>();
         solver.assert(&Bool::pb_le(ctx, &am1, 1));
+
+        if state_seq > 0 {
+            for state_token in state_tokens.iter() {
+                // If a token is active, the previous state must also be active.
+                let mut clause = Vec::new();
+                if let Some(active) = state_token.active.as_ref() {
+                    clause.push(Bool::not(active));
+                }
+
+                // any in the previous state
+                let prev_state_idx = timelines[timeline_idx].states[state_seq - 1];
+                let mut any_const = false;
+                for token in states[prev_state_idx].tokens.iter().copied() {
+                    if let Some(active) = tokens[token].active.as_ref() {
+                        clause.push(active.clone());
+                    } else {
+                        any_const = true;
+                    }
+                }
+
+                if !any_const {
+                    let clause_refs = clause.iter().collect::<Vec<_>>();
+                    solver.assert(&Bool::or(ctx, &clause_refs));
+                }
+            }
+        }
 
         let token_idxs = state_tokens
             .iter()
@@ -900,13 +1001,13 @@ fn next_values_from<'a>(timeline: &'a problem::Timeline, prev_values: Option<&[&
 
     for value_spec in timeline.values.iter() {
         if let Some(prev_values) = prev_values {
-            // When we are looking for a next value from a previous on, if any of the
+            // When we are looking for a next value from a previous one, if any of the
             // previous values are referred to as a transition condition, then the value is included.
             if prev_values.iter().any(|pv| {
                 value_spec
                     .conditions
                     .iter()
-                    .any(|c| c.is_timeline_transition_from(&timeline.name, pv))
+                    .any(|c| c.is_timeline_transition_from(&timeline.name) == Some(pv))
             }) {
                 next_values.insert(&value_spec.name);
             }
@@ -915,12 +1016,27 @@ fn next_values_from<'a>(timeline: &'a problem::Timeline, prev_values: Option<&[&
             if !value_spec
                 .conditions
                 .iter()
-                .any(|c| c.is_timeline_transition(&timeline.name))
+                .any(|c| c.is_timeline_transition_from(&timeline.name).is_some())
             {
                 next_values.insert(&value_spec.name);
             }
         }
     }
+
+    // Also, all the transition TO specific values are included.
+    if let Some(prev_values) = prev_values {
+        for prev_value in prev_values.iter() {
+            if let Some(value_spec) = timeline.values.iter().find(|v| &v.name == prev_value) {
+                for cond in value_spec.conditions.iter() {
+                    if let Some(target) = cond.is_timeline_transition_to(&timeline.name) {
+                        next_values.insert(target);
+                    }
+                }
+            }
+        }
+    }
+
+    println!("Next values from {} {:?} {:?}", timeline.name, prev_values, next_values);
 
     next_values
 }
@@ -936,21 +1052,13 @@ fn distance_to(timeline: &problem::Timeline, start_values: &[&str], goal_value: 
     let mut steps = 1;
     loop {
         let mut next_values = HashSet::new();
-        for current_value in current_values.iter() {
-            for value_spec in timeline.values.iter() {
-                if value_spec
-                    .conditions
-                    .iter()
-                    .any(|c| c.is_timeline_transition_from(&timeline.name, current_value))
-                {
-                    if goal_value == value_spec.name {
-                        return Some(steps);
-                    }
+        for next in next_values_from(timeline, Some(&current_values.iter().copied().collect::<Vec<_>>())) {
+            if goal_value == next {
+                return Some(steps);
+            }
 
-                    if visited_values.insert(value_spec.name.as_str()) {
-                        next_values.insert(value_spec.name.as_str());
-                    }
-                }
+            if visited_values.insert(next) {
+                next_values.insert(next);
             }
         }
 

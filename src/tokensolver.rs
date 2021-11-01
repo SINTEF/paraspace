@@ -198,6 +198,7 @@ pub fn solve(problem: &Problem) -> Result<Solution, SolverError> {
                     }
 
                     for condition in state.conditions.iter() {
+                        // assert!(condition.len() == 1, "Disjunctive goals not supported");
                         // println!("  -cond {} {:?}", token_idx, condition);
                         links.push(Link {
                             token_idx,
@@ -337,7 +338,7 @@ pub fn solve(problem: &Problem) -> Result<Solution, SolverError> {
                         let choose_link = Bool::fresh_const(&ctx, "cl");
 
                         let temporal_rel = match link.linkspec.temporal_relationship {
-                            TemporalRelationship::Meet => vec![Real::_eq(
+                            TemporalRelationship::MetBy => vec![Real::_eq(
                                 tokens[token_idx].end_time.as_ref().unwrap(),
                                 token.start_time.as_ref().unwrap(),
                             )],
@@ -351,6 +352,7 @@ pub fn solve(problem: &Problem) -> Result<Solution, SolverError> {
                                     tokens[token_idx].end_time.as_ref().unwrap(),
                                 ),
                             ],
+                            TemporalRelationship::Meets => todo!(),
                         };
 
                         if link.linkspec.amount > 0 {

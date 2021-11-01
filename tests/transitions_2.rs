@@ -16,7 +16,7 @@ pub fn transitions_2() {
                 Value {
                     name: "s2".to_string(),
                     conditions: vec![Condition {
-                        temporal_relationship: TemporalRelationship::Meet,
+                        temporal_relationship: TemporalRelationship::MetBy,
                         amount: 0,
                         object: ObjectSet::Object("obj".to_string()),
                         value: "s1".to_string(),
@@ -27,7 +27,7 @@ pub fn transitions_2() {
                 Value {
                     name: "s3".to_string(),
                     conditions: vec![Condition {
-                        temporal_relationship: TemporalRelationship::Meet,
+                        temporal_relationship: TemporalRelationship::MetBy,
                         amount: 0,
                         object: ObjectSet::Object("obj".to_string()),
                         value: "s2".to_string(),

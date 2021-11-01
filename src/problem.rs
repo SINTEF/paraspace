@@ -50,20 +50,20 @@ pub struct Condition {
 }
 
 impl Condition {
-    pub fn is_timeline_transition(&self, timeline: &str) -> bool {
-        matches!(self.temporal_relationship, TemporalRelationship::Meet)
-            && self.object == ObjectSet::Object(timeline.to_string())
+    pub fn is_timeline_transition_from(&self, timeline: &str) -> Option<&str> {
+        (matches!(self.temporal_relationship, TemporalRelationship::MetBy)
+            && self.object == ObjectSet::Object(timeline.to_string())).then(|| self.value.as_str())
     }
-    pub fn is_timeline_transition_from(&self, timeline: &str, value :&str) -> bool {
-        matches!(self.temporal_relationship, TemporalRelationship::Meet)
-            && self.object == ObjectSet::Object(timeline.to_string())
-            && self.value == value
+    pub fn is_timeline_transition_to(&self, timeline: &str) -> Option<&str> {
+        (matches!(self.temporal_relationship, TemporalRelationship::Meets)
+            && self.object == ObjectSet::Object(timeline.to_string())).then(|| self.value.as_str())
     }
 }
 
 #[derive(Serialize, Deserialize, Debug)]
 pub enum TemporalRelationship {
-    Meet,
+    MetBy,
+    Meets,
     Cover,
 }
 

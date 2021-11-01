@@ -27,8 +27,8 @@ class Problem():
     def goal(self, timeline, value, capacity=0):
         self.tokens.append({"timeline_name": timeline, "value": value, "const_time": { "Goal": None }, "capacity": capacity})
 
-    def fact(self, timeline, value, capacity=0):
-        self.tokens.append({"timeline_name": timeline, "value": value, "const_time": { "Fact": [None,None] }, "capacity": capacity})
+    def fact(self, timeline, value, start=None, end=None, capacity=0):
+        self.tokens.append({"timeline_name": timeline, "value": value, "const_time": { "Fact": [start,end] }, "capacity": capacity})
 
     def to_dict(self):
         return {"groups": [{"name": key, "members": value } for key,value in self.groups.items()],
@@ -51,7 +51,17 @@ class TransitionFrom:
     value :Any
 
 @dataclass
+class TransitionTo:
+    value :Any
+
+@dataclass
 class MetBy:
+    timelineref: Any
+    value :Any
+    amount :int = 0
+
+@dataclass
+class Meets:
     timelineref: Any
     value :Any
     amount :int = 0
@@ -98,9 +108,13 @@ def condition_to_dict(obj_name, condition):
     if isinstance(condition, UseResource):
         return { "temporal_relationship": "Cover", "object": objectref_to_dict(condition.resource), "value": "Available", "amount": condition.amount }
     elif isinstance(condition, TransitionFrom):
-        return { "temporal_relationship": "Meet", "object": objectref_to_dict(obj_name), "value": condition.value, "amount": 0}
+        return { "temporal_relationship": "MetBy", "object": objectref_to_dict(obj_name), "value": condition.value, "amount": 0}
+    elif isinstance(condition, TransitionTo):
+        return { "temporal_relationship": "Meets", "object": objectref_to_dict(obj_name), "value": condition.value, "amount": 0}
     elif isinstance(condition, MetBy):
-        return { "temporal_relationship": "Meet", "object":  objectref_to_dict(condition.timelineref), "value": condition.value, "amount": condition.amount }
+        return { "temporal_relationship": "MetBy", "object":  objectref_to_dict(condition.timelineref), "value": condition.value, "amount": condition.amount }
+    elif isinstance(condition, Meets):
+        return { "temporal_relationship": "Meets", "object":  objectref_to_dict(condition.timelineref), "value": condition.value, "amount": condition.amount }
     elif isinstance(condition, During):
         return { "temporal_relationship": "Cover", "object":  objectref_to_dict(condition.timelineref), "value": condition.value, "amount": condition.amount }
     raise Exception(f"Unknown condition type {condition}")
