@@ -85,7 +85,7 @@ class Timeline():
     def to_dict(self):
         return {
             "name": self.name,
-            "states": self.states,
+            "values": self.states,
         }
 
 def objectref_to_dict(objectref):

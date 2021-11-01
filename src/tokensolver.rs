@@ -1,4 +1,4 @@
-use crate::SolverError;
+use crate::{SolverError, from_z3_real};
 use z3::ast::Ast;
 use z3::ast::{Bool, Real};
 use z3::SatResult;
@@ -9,6 +9,7 @@ use std::collections::HashMap;
 
 
 pub fn solve(problem: &Problem) -> Result<Solution, SolverError> {
+    println!("Starting pure-token-based solver.");
     let z3_config = z3::Config::new();
     let ctx = z3::Context::new(&z3_config);
     let solver = z3::Solver::new(&ctx);
@@ -604,11 +605,6 @@ pub fn solve(problem: &Problem) -> Result<Solution, SolverError> {
     }
 }
 
-
-fn from_z3_real(real: &Real) -> f32 {
-    let (num, den) = real.as_real().unwrap();
-    num as f32 / den as f32
-}
 
 struct Link<'a, 'z3> {
     token_idx: usize,

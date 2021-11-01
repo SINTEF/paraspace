@@ -6,14 +6,14 @@ pub fn transitions_1() {
         groups: Vec::new(),
         timelines: vec![Timeline {
             name: "obj".to_string(),
-            states: vec![
-                State {
+            values: vec![
+                Value {
                     name: "s1".to_string(),
                     conditions: Vec::new(),
                     duration: (5, Some(6)),
                     capacity: 0,
                 },
-                State {
+                Value {
                     name: "s2".to_string(),
                     conditions: vec![
                         Condition {

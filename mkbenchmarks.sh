@@ -1,3 +1,3 @@
 #!/bin/sh
-python3 frontend/carbonaraproblem.py
-python3 frontend/ceramicproblem.py
+python frontend/carbonaraproblem.py
+python frontend/ceramicproblem.py

@@ -1,55 +1,47 @@
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
-#[derive(Serialize, Deserialize)]
-#[derive(Debug)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct Problem {
-    pub timelines :Vec<Timeline>,
+    pub timelines: Vec<Timeline>,
     pub groups: Vec<Group>,
-    pub tokens :Vec<Token>,
+    pub tokens: Vec<Token>,
 }
 
-#[derive(Serialize, Deserialize)]
-#[derive(Debug)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct Group {
-    pub name :String,
-    pub members :Vec<String>,
+    pub name: String,
+    pub members: Vec<String>,
 }
 
-
-#[derive(Serialize, Deserialize)]
-#[derive(Debug)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct Token {
-    pub timeline_name :String,
-    pub value :String,
-    pub capacity :u32,
-    pub const_time :TokenTime,
+    pub timeline_name: String,
+    pub value: String,
+    pub capacity: u32,
+    pub const_time: TokenTime,
 }
 
-#[derive(Serialize, Deserialize)]
-#[derive(Debug)]
+#[derive(Serialize, Deserialize, Debug)]
 pub enum TokenTime {
     Fact(Option<usize>, Option<usize>),
     Goal,
 }
 
-#[derive(Serialize, Deserialize)]
-#[derive(Debug)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct Timeline {
-    pub name :String,
-    pub values :Vec<Value>,
+    pub name: String,
+    pub values: Vec<Value>,
 }
 
-#[derive(Debug)]
-#[derive(Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct Value {
-    pub name :String,
-    pub duration :(usize,Option<usize>),
-    pub conditions :Vec<Condition>,
-    pub capacity :u32,
+    pub name: String,
+    pub duration: (usize, Option<usize>),
+    pub conditions: Vec<Condition>,
+    pub capacity: u32,
 }
 
-#[derive(Serialize, Deserialize)]
-#[derive(Debug)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct Condition {
     pub temporal_relationship: TemporalRelationship,
     pub object: ObjectSet,
@@ -57,17 +49,25 @@ pub struct Condition {
     pub amount: u32,
 }
 
-#[derive(Serialize, Deserialize)]
-#[derive(Debug)]
+impl Condition {
+    pub fn is_timeline_transition(&self, timeline: &str) -> bool {
+        matches!(self.temporal_relationship, TemporalRelationship::Meet)
+            && self.object == ObjectSet::Object(timeline.to_string())
+    }
+    pub fn is_timeline_transition_from(&self, timeline: &str, value :&str) -> bool {
+        matches!(self.temporal_relationship, TemporalRelationship::Meet)
+            && self.object == ObjectSet::Object(timeline.to_string())
+            && self.value == value
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug)]
 pub enum TemporalRelationship {
     Meet,
     Cover,
 }
 
-#[derive(Serialize, Deserialize)]
-#[derive(Debug)]
-#[derive(Clone)]
-#[derive(Hash, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Serialize, Deserialize, Debug, Clone, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub enum ObjectSet {
     Group(String),
     Object(String),
@@ -77,19 +77,15 @@ pub enum ObjectSet {
 // SOLUTION
 //
 
-
-#[derive(Serialize, Deserialize)]
-#[derive(Debug)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct Solution {
     pub tokens: Vec<SolutionToken>,
 }
 
-#[derive(Serialize, Deserialize)]
-#[derive(Debug)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct SolutionToken {
-    pub object_name :String,
-    pub value :String,
-    pub start_time :f32,
-    pub end_time :f32,
+    pub object_name: String,
+    pub value: String,
+    pub start_time: f32,
+    pub end_time: f32,
 }
-

@@ -1,7 +1,6 @@
 use std::path::PathBuf;
 use structopt::StructOpt;
-use timelinemodel::{print_calc_time, problem, tokensolver};
-
+use timelinemodel::{print_calc_time, problem, tokensolver, transitionsolver};
 
 #[derive(Debug, StructOpt)]
 #[structopt(name = "timelinemodel", about = "Timelines SMT-based solver.")]
@@ -16,6 +15,10 @@ struct Opt {
 
     #[structopt(long = "benchmark")]
     perftest: bool,
+
+    /// Use pure token-based representation.
+    #[structopt(long = "tokensolver")]
+    tokensolver: bool,
 }
 
 fn main() {
@@ -26,10 +29,16 @@ fn main() {
         perftest();
     }
 
+    let solver_func = if opt.tokensolver {
+        tokensolver::solve
+    } else {
+        transitionsolver::solve
+    };
+
     if let Some(filename) = opt.input {
         let contents = std::fs::read_to_string(&filename).unwrap();
         let problem = serde_json::de::from_str::<problem::Problem>(&contents).unwrap();
-        let result = print_calc_time(filename.to_str().unwrap(), || tokensolver::solve(&problem));
+        let result = print_calc_time(filename.to_str().unwrap(), || solver_func(&problem));
         match result {
             Ok(solution) => {
                 println!("Solved.");
