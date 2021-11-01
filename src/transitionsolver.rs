@@ -110,7 +110,7 @@ pub fn solve(problem: &Problem) -> Result<Solution, SolverError> {
                 .states
                 .is_empty()
             {
-                todo!("Multiple facts.");
+                // todo!("Multiple facts.");
             }
 
             let token_idx = tokens.len();
