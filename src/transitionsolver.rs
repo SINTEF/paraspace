@@ -166,6 +166,26 @@ pub fn solve(problem: &Problem) -> Result<Solution, SolverError> {
         }
     }
 
+    // TODO :: this gives a perf boost on GOAC isntances
+    // because we don't need to find so many UNSAT. 
+    // Could do a pidgeonhole argument for all the constant links to the same timeline,
+    //   and expand this from the beginning?
+
+    // for timeline in 0..timelines.len() {
+    //     if  timeline_names[timeline] == "loc" {
+    //         let expanded = expand_n(
+    //             problem,
+    //             &ctx,
+    //             &solver,
+    //             timeline,
+    //             &mut timelines,
+    //             &mut states,
+    //             &mut tokens,
+    //             16,
+    //         );
+    //     }
+    // }
+
     let mut n_smt_calls = 0;
 
     // REFINEMENT LOOP
@@ -990,7 +1010,21 @@ fn expand_until<'a, 'z>(
     };
 
     assert!(n > 0);
+    expand_n(problem, ctx, solver, timeline_idx, timelines, states, tokens, n);
+    true
+}
 
+#[allow(clippy::too_many_arguments)]
+fn expand_n<'a, 'z>(
+    problem: &'a Problem,
+    ctx: &'z z3::Context,
+    solver: &z3::Solver,
+    timeline_idx: usize,
+    timelines: &mut Vec<Timeline<'z>>,
+    states: &mut Vec<State<'z>>,
+    tokens: &mut Vec<Token<'a, 'z>>,
+    n: usize,
+) {
     for _ in 0..n {
         let (state_seq, start_time, prev_values) =
             if let Some(prev_state_idx) = timelines[timeline_idx].states.last().copied() {
@@ -1085,8 +1119,6 @@ fn expand_until<'a, 'z>(
         });
         timelines[timeline_idx].states.push(state_idx);
     }
-
-    true
 }
 
 fn next_values_from<'a>(timeline: &'a problem::Timeline, prev_values: Option<&[&'a str]>) -> HashSet<&'a str> {
