@@ -44,11 +44,11 @@ pub fn solve(problem: &Problem) -> Result<Solution, SolverError> {
     let ctx = z3::Context::new(&z3_config);
     let solver = z3::Solver::new(&ctx);
 
-    // let mut params = z3::Params::new(&ctx);
-    // params.set_bool("auto_config", false);
-    // params.set_u32("smt.arith.solver", 6);
-    // // println!("Z3 params:\n{}", params.to_string());
-    // solver.set_params(&params);
+    let mut params = z3::Params::new(&ctx);
+    params.set_bool("auto_config", false);
+    params.set_u32("smt.arith.solver", 6);
+    // println!("Z3 params:\n{}", params.to_string());
+    solver.set_params(&params);
 
     let groups_by_name = problem
         .groups
@@ -858,17 +858,17 @@ pub fn solve(problem: &Problem) -> Result<Solution, SolverError> {
         //     println!("Timeline {} has {} states", timeline_names[i], timeline.states.len());
         // }
 
-        println!(
-            "Solving with {} timelines {} states {} tokens {} conditions {} goal_exp {} link_exp {} pairexcl. {} pbs",
-            timelines.len(),
-            states.len(),
-            tokens.len(),
-            conds.len(),
-            expand_goal_state_lits.len(),
-            expand_links_lits.len(),
-            n_exclusions,
-            n_pbs,
-        );
+        // println!(
+        //     "Solving with {} timelines {} states {} tokens {} conditions {} goal_exp {} link_exp {} pairexcl. {} pbs",
+        //     timelines.len(),
+        //     states.len(),
+        //     tokens.len(),
+        //     conds.len(),
+        //     expand_goal_state_lits.len(),
+        //     expand_links_lits.len(),
+        //     n_exclusions,
+        //     n_pbs,
+        // );
 
         // println!("{}", solver.to_string());
 
@@ -925,7 +925,7 @@ pub fn solve(problem: &Problem) -> Result<Solution, SolverError> {
             }
 
             z3::SatResult::Sat => {
-                println!("SAT after {} solver calls", n_smt_calls);
+                // println!("SAT after {} solver calls", n_smt_calls);
                 let model = solver.get_model().unwrap();
                 // println!("{}", model.to_string());
 
