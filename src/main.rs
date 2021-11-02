@@ -72,6 +72,13 @@ fn perftest() {
         problem_names.push(problem_name);
     }
 
+    for n_pics in 1..=9 {
+        for n_windows in 1..=5 {
+            let problem_name = format!("goac_{}pics_{}wind", n_pics, n_windows);
+            problem_names.push(problem_name);
+        }
+    }
+
     for problem_name in problem_names {
         let contents = std::fs::read_to_string(&format!("examples/{}.json", problem_name)).unwrap();
         let problem = serde_json::de::from_str::<problem::Problem>(&contents).unwrap();

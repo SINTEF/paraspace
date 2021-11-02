@@ -32,7 +32,7 @@ edges = [
 edges = edges + [(b,a,l) for a,b,l in edges]
 
 
-for n_pics in [1,2,3,4,5,6,7,8]:
+for n_pics in [1,2,3,4,5,6,7,8,9]:
     for n_windows in [1,2,3,4,5]:
 
         p = Problem()
