@@ -13,7 +13,7 @@ with open(filename, "r") as f:
 
 print(f"got model {model}")
 
-fig, ax = plt.subplots(figsize=(20,20),dpi=200)
+fig, ax = plt.subplots(figsize=(10,6),dpi=120)
 
 def rat(x):
     return float(x[0]) / float(x[1])
