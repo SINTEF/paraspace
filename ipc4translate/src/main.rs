@@ -12,7 +12,7 @@ fn main() {
 
 fn convert_satellites() {
     let domain = sexp::parse(&std::fs::read_to_string("satellite.domain.txt").unwrap()).unwrap();
-    let instance = sexp::parse(&std::fs::read_to_string("satellite.p36.txt").unwrap()).unwrap();
+    let instance = sexp::parse(&std::fs::read_to_string("satellite.p01.txt").unwrap()).unwrap();
 
     let stmts = domain.unwrap_list().iter().collect::<Vec<_>>();
     assert!(stmts[0].unwrap_atom().to_string() == "define");
@@ -85,11 +85,11 @@ fn convert_satellites() {
                     // objects.push((name, objtype));
 
                     match objtype.to_string().as_str() {
-                        "satellite" => satellites.push(name.to_string()),
-                        "instrument" => instruments.push(name.to_string()),
-                        "mode" => modes.push(name.to_string()),
-                        "direction" => directions.push(name.to_string()),
-                        "antenna" => antennas.push(name.to_string()),
+                        "satellite" => satellites.push(name.to_string().to_lowercase()),
+                        "instrument" => instruments.push(name.to_string().to_lowercase()),
+                        "mode" => modes.push(name.to_string().to_lowercase()),
+                        "direction" => directions.push(name.to_string().to_lowercase()),
+                        "antenna" => antennas.push(name.to_string().to_lowercase()),
                         _ => panic!(),
                     }
                 }
@@ -97,19 +97,24 @@ fn convert_satellites() {
             ":init" => {
                 for initstmt in &stmt[1..] {
                     let stmt = initstmt.unwrap_list();
-                    match stmt[0].unwrap_atom().to_string().as_str() {
-                        "supports" => {
-                            supports.push((stmt[1].unwrap_atom().to_string(), stmt[2].unwrap_atom().to_string()))
-                        }
-                        "calibration_target" => calibration_target
-                            .push((stmt[1].unwrap_atom().to_string(), stmt[2].unwrap_atom().to_string())),
-                        "on_board" => {
-                            on_board.push((stmt[1].unwrap_atom().to_string(), stmt[2].unwrap_atom().to_string()))
-                        }
-                        "power_avail" => power_avail.push(stmt[1].unwrap_atom().to_string()),
-                        "pointing" => {
-                            pointing.push((stmt[1].unwrap_atom().to_string(), stmt[2].unwrap_atom().to_string()))
-                        }
+                    match stmt[0].unwrap_atom().to_string().to_lowercase().as_str() {
+                        "supports" => supports.push((
+                            stmt[1].unwrap_atom().to_string().to_lowercase(),
+                            stmt[2].unwrap_atom().to_string().to_lowercase(),
+                        )),
+                        "calibration_target" => calibration_target.push((
+                            stmt[1].unwrap_atom().to_string().to_lowercase(),
+                            stmt[2].unwrap_atom().to_string().to_lowercase(),
+                        )),
+                        "on_board" => on_board.push((
+                            stmt[1].unwrap_atom().to_string().to_lowercase(),
+                            stmt[2].unwrap_atom().to_string().to_lowercase(),
+                        )),
+                        "power_avail" => power_avail.push(stmt[1].unwrap_atom().to_string().to_lowercase()),
+                        "pointing" => pointing.push((
+                            stmt[1].unwrap_atom().to_string().to_lowercase(),
+                            stmt[2].unwrap_atom().to_string().to_lowercase(),
+                        )),
                         "=" => {
                             let lhs = stmt[1].unwrap_list();
                             let rhs = match stmt[2].unwrap_atom() {
@@ -121,22 +126,22 @@ fn convert_satellites() {
                             match lhs[0].unwrap_atom().to_string().as_str() {
                                 "slew_time" => {
                                     slew_time.push((
-                                        lhs[1].unwrap_atom().to_string(),
-                                        lhs[2].unwrap_atom().to_string(),
+                                        lhs[1].unwrap_atom().to_string().to_lowercase(),
+                                        lhs[2].unwrap_atom().to_string().to_lowercase(),
                                         rhs,
                                     ));
                                 }
                                 "calibration_time" => {
                                     calibration_time.push((
-                                        lhs[1].unwrap_atom().to_string(),
-                                        lhs[2].unwrap_atom().to_string(),
+                                        lhs[1].unwrap_atom().to_string().to_lowercase(),
+                                        lhs[2].unwrap_atom().to_string().to_lowercase(),
                                         rhs,
                                     ));
                                 }
                                 "send_time" => {
                                     send_time.push((
-                                        lhs[1].unwrap_atom().to_string(),
-                                        lhs[2].unwrap_atom().to_string(),
+                                        lhs[1].unwrap_atom().to_string().to_lowercase(),
+                                        lhs[2].unwrap_atom().to_string().to_lowercase(),
                                         rhs,
                                     ));
                                 }
@@ -151,7 +156,7 @@ fn convert_satellites() {
                             };
                             let mut expr = stmt[2].unwrap_list();
 
-                            let not = if expr[0].unwrap_atom().to_string().as_str() == "not" {
+                            let not = if expr[0].unwrap_atom().to_string().as_str().to_lowercase() == "not" {
                                 expr = expr[1].unwrap_list();
                                 true
                             } else {
@@ -160,15 +165,15 @@ fn convert_satellites() {
 
                             match expr[0].unwrap_atom().to_string().as_str() {
                                 "visible" => {
-                                    let a = expr[1].unwrap_atom().to_string();
-                                    let b = expr[2].unwrap_atom().to_string();
+                                    let a = expr[1].unwrap_atom().to_string().to_lowercase();
+                                    let b = expr[2].unwrap_atom().to_string().to_lowercase();
                                     visibility_windows.push((a, b, t, not));
                                 }
                                 _ => panic!(),
                             };
                         }
                         "available" => {
-                            let a = stmt[1].unwrap_atom().to_string();
+                            let a = stmt[1].unwrap_atom().to_string().to_lowercase();
                             if antennas.iter().any(|b| &a == b) {
                                 available_antennas.push(a);
                             } else {
@@ -187,13 +192,13 @@ fn convert_satellites() {
                     let goal = goal.unwrap_list();
                     match goal[0].unwrap_atom().to_string().as_str() {
                         "sent_image" => {
-                            let a = goal[1].unwrap_atom().to_string();
-                            let b = goal[2].unwrap_atom().to_string();
+                            let a = goal[1].unwrap_atom().to_string().to_lowercase();
+                            let b = goal[2].unwrap_atom().to_string().to_lowercase();
                             goal_images.push((a, b));
                         }
                         "pointing" => {
-                            let a = goal[1].unwrap_atom().to_string();
-                            let b = goal[2].unwrap_atom().to_string();
+                            let a = goal[1].unwrap_atom().to_string().to_lowercase();
+                            let b = goal[2].unwrap_atom().to_string().to_lowercase();
                             goal_pointing.push((a, b));
                         }
                         g => {
@@ -290,6 +295,12 @@ fn convert_satellites() {
 
         timelines.insert(timeline_name, tokentypes);
     }
+    println!(
+        "{} satellites X {} slews = {}",
+        satellites.len(),
+        slew_time.len(),
+        timelines.len()
+    );
 
     // 2. HAVEIMAGE
     for dir in directions.iter() {
@@ -312,6 +323,8 @@ fn convert_satellites() {
             );
         }
     }
+
+    println!("haveimage dirs = {} X modes = {}", directions.len(), modes.len());
 
     //
     // 2. INSTRUMENT TAKEIMAGE MODE DIRECTION
@@ -357,9 +370,21 @@ fn convert_satellites() {
                         amount: 0,
                         value: "Off".to_string(),
                     },
+                    Condition {
+                        temporal_relationship: TemporalRelationship::MetBy,
+                        object: ObjectSet::Object(tl_name.clone()),
+                        amount: 0,
+                        value: "Calibrated".to_string(),
+                    },
                     power_cond.clone(),
                 ],
                 duration: (100, None),
+            },
+            TokenType {
+                name: "Calibrated".to_string(),
+                capacity: 0,
+                conditions: vec![power_cond.clone()],
+                duration: (1, None),
             },
         ];
 
@@ -380,6 +405,12 @@ fn convert_satellites() {
                             object: ObjectSet::Object(tl_name.clone()),
                             amount: 0,
                             value: "SwitchOn".to_string(),
+                        },
+                        Condition {
+                            temporal_relationship: TemporalRelationship::Meets,
+                            object: ObjectSet::Object(tl_name.clone()),
+                            amount: 0,
+                            value: "Calibrated".to_string(),
                         },
                         power_cond.clone(),
                     ],
@@ -402,6 +433,12 @@ fn convert_satellites() {
                                 value: "Calibrated".to_string(),
                             },
                             Condition {
+                                temporal_relationship: TemporalRelationship::Meets,
+                                object: ObjectSet::Object(tl_name.clone()),
+                                amount: 0,
+                                value: "Calibrated".to_string(),
+                            },
+                            Condition {
                                 temporal_relationship: TemporalRelationship::Cover,
                                 object: ObjectSet::Object(format!("dir_{}", instrument_belongs_to[instrument])),
                                 amount: 0,
@@ -417,20 +454,80 @@ fn convert_satellites() {
         timelines.insert(tl_name.clone(), values);
     }
 
+    println!(
+        "instruments= {} dirs = {} X modes = {}",
+        instruments.len(),
+        directions.len(),
+        modes.len()
+    );
+
+    let mut statictokens = Vec::new();
+
     //
     // 3.
     //
     // SEND IMAGES
     for (dir, mode) in goal_images.iter() {
+        let t = send_time
+            .iter()
+            .find_map(|(d, m, t)| (d == dir && m == mode).then(|| *t))
+            .unwrap();
+        let dur = (t * 100. + 0.5) as usize;
 
-        let t = send_time.iter().find_map(|(d,m,t)| (d == dir&& m == mode ).then(|| *t)).unwrap();
-        let dur = (t*100. + 0.5) as usize;
+        let timeline_name = format!("SendImage_{}_{}", dir, mode);
+        let tokentypes = vec![
+            TokenType {
+                name: "HaveImage".to_string(),
+                duration: (dur, Some(dur)),
+                conditions: vec![Condition {
+                    temporal_relationship: TemporalRelationship::MetBy,
+                    amount: 0,
+                    object: ObjectSet::Group("Instruments".to_string()),
+                    value: format!("TakeImage_{}_{}", dir, mode),
+                }],
+                capacity: 0,
+            },
+            TokenType {
+                name: "Send".to_string(),
+                duration: (dur, Some(dur)),
+                conditions: vec![
+                    Condition {
+                        temporal_relationship: TemporalRelationship::MetBy,
+                        object: ObjectSet::Object(timeline_name.clone()),
+                        amount: 0,
+                        value: "HaveImage".to_string(),
+                    },
+                    Condition {
+                        temporal_relationship: TemporalRelationship::Cover,
+                        object: ObjectSet::Group("Antennas".to_string()),
+                        amount: 1,
+                        value: "Available".to_string(),
+                    },
+                ],
+                capacity: 0,
+            },
+            TokenType {
+                name: "Sent".to_string(),
+                duration: (1, None),
+                conditions: vec![Condition {
+                    temporal_relationship: TemporalRelationship::MetBy,
+                    object: ObjectSet::Object(timeline_name.clone()),
+                    amount: 0,
+                    value: "Send".to_string(),
+                }],
+                capacity: 0,
+            },
+        ];
 
+        timelines.insert(timeline_name.clone(), tokentypes);
 
-
+        statictokens.push(Token {
+            timeline_name,
+            capacity: 0,
+            const_time: TokenTime::Goal,
+            value: "Sent".to_string(),
+        });
     }
-
-    let mut statictokens = Vec::new();
 
     // SATELLITE POWER
     for sat in satellites.iter() {
@@ -453,6 +550,56 @@ fn convert_satellites() {
             const_time: TokenTime::Fact(None, None),
         });
     }
+
+    // POINTSTO goal
+    for (sat, dir) in goal_pointing.iter() {
+        let timeline_name = format!("{}_dir", sat);
+        let value = format!("pointsto_{}", dir);
+        statictokens.push(Token {
+            timeline_name,
+            value,
+            capacity: 0,
+            const_time: TokenTime::Goal,
+        });
+    }
+
+    // ANTENNAS VISIBLE TIME WINDOWS
+
+    let mut antennas: HashMap<String, Vec<(f64, f64)>> = HashMap::new();
+    let mut start_times = HashMap::new();
+    for (a, b, t, on) in visibility_windows.iter() {
+        if !on {
+            assert!(start_times.insert((a, b), t).is_none());
+        } else {
+            let t0 = start_times.remove(&(a, b)).unwrap();
+            antennas.entry(a.clone()).or_default().push((*t0, *t));
+        }
+    }
+    for (antenna, windows) in antennas {
+        for (t1, t2) in windows {
+            let t1 = (t1 * 100. + 0.5) as usize;
+            let t2 = (t2 * 100. + 0.5) as usize;
+            statictokens.push(Token {
+                timeline_name: antenna.clone(),
+                value: "Available".to_string(),
+                capacity: 1,
+                const_time: TokenTime::Fact(Some(t1), Some(t2)),
+            })
+        }
+    }
+
+    let mut groups = Vec::new();
+    let problem = Problem {
+        groups,
+        timelines: timelines
+            .into_iter()
+            .map(|(n, t)| Timeline { name: n, values: t })
+            .collect(),
+        tokens: statictokens,
+    };
+    
+    let json =serde_json::to_string(&problem).unwrap();
+    std::fs::write("satellite.01.json", &json).unwrap();
 }
 
 trait SexpUnwrap {
