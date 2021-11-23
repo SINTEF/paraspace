@@ -39,6 +39,8 @@ struct Timeline<'z> {
 }
 
 pub fn solve(problem: &Problem) -> Result<Solution, SolverError> {
+    let _p = hprof::enter("solve");
+    let p1 = hprof::enter("prepare");
     // println!("Starting transition-and-pocl solver.");
     let z3_config = z3::Config::new();
     let ctx = z3::Context::new(&z3_config);
@@ -167,7 +169,7 @@ pub fn solve(problem: &Problem) -> Result<Solution, SolverError> {
     }
 
     // TODO :: this gives a perf boost on GOAC isntances
-    // because we don't need to find so many UNSAT. 
+    // because we don't need to find so many UNSAT.
     // Could do a pidgeonhole argument for all the constant links to the same timeline,
     //   and expand this from the beginning?
 
@@ -188,6 +190,10 @@ pub fn solve(problem: &Problem) -> Result<Solution, SolverError> {
 
     let mut n_smt_calls = 0;
 
+    println!("TL names {:?}", timelines_by_name);
+
+    drop(p1);
+
     // REFINEMENT LOOP
     '_refinement: loop {
         // EXPAND PROBLEM FORMULATION
@@ -197,6 +203,8 @@ pub fn solve(problem: &Problem) -> Result<Solution, SolverError> {
             || conds_queue < conds.len()
             || !expand_links_queue.is_empty()
         {
+            let p = hprof::enter("expand_states");
+
             while states_queue < states.len() {
                 let state_idx = states_queue;
                 states_queue += 1;
@@ -329,6 +337,8 @@ pub fn solve(problem: &Problem) -> Result<Solution, SolverError> {
                 }
             }
 
+            drop(p);
+            let p = hprof::enter("expand_tokens");
             while tokens_queue < tokens.len() {
                 let token_idx = tokens_queue;
                 tokens_queue += 1;
@@ -468,6 +478,8 @@ pub fn solve(problem: &Problem) -> Result<Solution, SolverError> {
                 }
             }
 
+            drop(p);
+            let p = hprof::enter("expand_conds");
             while conds_queue < conds.len() || !expand_links_queue.is_empty() {
                 let (need_new_token, cond_idx) = if conds_queue < conds.len() {
                     let cond_idx = conds_queue;
@@ -551,15 +563,29 @@ pub fn solve(problem: &Problem) -> Result<Solution, SolverError> {
 
                             break;
                         } else {
-                            println!("Could not expand.");
+                            // println!("Could not expand.");
                         }
                     }
                 }
 
-                if need_new_token && new_target_tokens.is_empty() {
-                    panic!("could not reach state");
-                }
-                if !new_target_tokens.is_empty() {
+                if new_target_tokens.is_empty() {
+                    if need_new_token && conds[cond_idx].alternatives_extension.is_none() {
+                        // Couldn't generate the first token, this condition can never be fulfilled.
+                        // println!(
+                        //     "unsatisfiable condition {:?} in token {}@{}",
+                        //     conds[cond_idx].cond_spec,
+                        //     tokens[conds[cond_idx].token_idx].value,
+                        //     timeline_names[states[tokens[conds[cond_idx].token_idx].state].timeline],
+                        // );
+
+                        if let Some(active) = tokens[conds[cond_idx].token_idx].active.as_ref() {
+                            solver.assert(&active.not());
+                        } else {
+                            println!("The token was constant, problem is unsat.");
+                            return Err(SolverError::NoSolution);
+                        }
+                    }
+                } else {
                     let mut alternatives = Vec::new();
 
                     let old_expansion_lit: Option<Bool> = conds[cond_idx].alternatives_extension.take();
@@ -716,6 +742,7 @@ pub fn solve(problem: &Problem) -> Result<Solution, SolverError> {
 
         let mut n_exclusions = 0;
         let mut n_pbs = 0;
+        let p = hprof::enter("expand_resources");
         for (_token_idx, rc) in resource_constraints.iter_mut() {
             if rc.users.len() > rc.integrated {
                 // We need to update the constraint.
@@ -758,7 +785,7 @@ pub fn solve(problem: &Problem) -> Result<Solution, SolverError> {
                     // Special-case parwise exclusion, which is probably faster than
                     // the long pseudo-boolean constraint needed for capacity >=2
 
-                    // println!("Cap1 exclusion {}", rc.users.len());
+                    println!("Cap1 exclusion {}", rc.users.len());
                     for i in 0..rc.users.len() {
                         for j in (i + 1)..rc.users.len() {
                             let (link1, token1, amount1) = &rc.users[i];
@@ -768,11 +795,11 @@ pub fn solve(problem: &Problem) -> Result<Solution, SolverError> {
                             assert!(*amount2 == 1);
 
                             let mut alts = vec![
-                                Real::lt(
+                                Real::le(
                                     &states[tokens[*token1].state].end_time,
                                     &states[tokens[*token2].state].start_time,
                                 ),
-                                Real::lt(
+                                Real::le(
                                     &states[tokens[*token2].state].end_time,
                                     &states[tokens[*token1].state].start_time,
                                 ),
@@ -848,6 +875,9 @@ pub fn solve(problem: &Problem) -> Result<Solution, SolverError> {
         //  - conditions choose from the set of possible causal links
         //  - possibly: resource constraint extension literals.
 
+        drop(p);
+        let p = hprof::enter("solve_smt");
+
         let neg_expansions = expand_links_lits
             .keys()
             .chain(expand_goal_state_lits.keys())
@@ -858,42 +888,46 @@ pub fn solve(problem: &Problem) -> Result<Solution, SolverError> {
         //     println!("Timeline {} has {} states", timeline_names[i], timeline.states.len());
         // }
 
-        // println!(
-        //     "Solving with {} timelines {} states {} tokens {} conditions {} goal_exp {} link_exp {} pairexcl. {} pbs",
-        //     timelines.len(),
-        //     states.len(),
-        //     tokens.len(),
-        //     conds.len(),
-        //     expand_goal_state_lits.len(),
-        //     expand_links_lits.len(),
-        //     n_exclusions,
-        //     n_pbs,
-        // );
+        println!(
+            "Solving with {} timelines {} states {} tokens {} conditions {} goal_exp {} link_exp {} pairexcl. {} pbs",
+            timelines.len(),
+            states.len(),
+            tokens.len(),
+            conds.len(),
+            expand_goal_state_lits.len(),
+            expand_links_lits.len(),
+            n_exclusions,
+            n_pbs,
+        );
 
         // println!("{}", solver.to_string());
+        // panic!();
 
         n_smt_calls += 1;
         let result = solver.check_assumptions(&neg_expansions.keys().cloned().collect::<Vec<_>>());
+        drop(p);
+
         match result {
             z3::SatResult::Unsat => {
-                let core = solver.get_unsat_core();
+                let p = hprof::enter("unsat_core");
+                let mut core = solver.get_unsat_core();
                 if core.is_empty() {
                     return Err(SolverError::NoSolution);
                 }
 
-                // let use_trim_core = false;
-                // let use_minimize_core = false;
+                let use_trim_core = true;
+                let use_minimize_core = true;
 
-                // if use_trim_core {
-                //     crate::cores::trim_core(&mut core, &solver);
-                // }
+                if use_trim_core {
+                    crate::cores::trim_core(&mut core, &solver, |_| {});
+                }
 
-                // if use_minimize_core {
-                //     crate::cores::minimize_core(&mut core, &solver);
-                // }
+                if use_minimize_core {
+                    crate::cores::minimize_core(&mut core, &solver, |_| {});
+                }
 
                 // core_sizes.push(core.len());
-                // println!("CORE SIZE #{}", core.len());
+                println!("CORE SIZE #{}", core.len());
                 for c in core {
                     if let Some(nc) = neg_expansions.get(&c) {
                         if let Some(_timeline) = expand_goal_state_lits.get(nc) {
@@ -905,8 +939,8 @@ pub fn solve(problem: &Problem) -> Result<Solution, SolverError> {
                             // );
                             // todo!()
                         } else if let Some(cond_idx) = expand_links_lits.get(nc).copied() {
-                            // let cond = &conds[cond_idx];
-                            // let token = &tokens[cond.token_idx];
+                            let cond = &conds[cond_idx];
+                            let _token = &tokens[cond.token_idx];
                             // println!(
                             //     "  -expand LINK {}.{} {:?}",
                             //     problem.timelines[states[token.state].timeline].name, token.value, cond.cond_spec
@@ -925,6 +959,7 @@ pub fn solve(problem: &Problem) -> Result<Solution, SolverError> {
             }
 
             z3::SatResult::Sat => {
+                let p = hprof::enter("extract_solution");
                 // println!("SAT after {} solver calls", n_smt_calls);
                 let model = solver.get_model().unwrap();
                 // println!("{}", model.to_string());
@@ -1048,12 +1083,14 @@ fn expand_n<'a, 'z>(
         let state_tokens = values
             .iter()
             .map(|value| {
-                let prev_unique = prev_values.is_none() || prev_values.as_ref().unwrap().len() == 1;
-                let active = if prev_unique && values.len() == 1 {
-                    None // only one chocie heree
-                } else {
-                    Some(Bool::fresh_const(ctx, "x"))
-                };
+                // let prev_unique = prev_values.is_none() || prev_values.as_ref().unwrap().len() == 1;
+                // let active = if prev_unique && values.len() == 1 {
+                //     None // only one chocie heree
+                // } else {
+                //     Some(Bool::fresh_const(ctx, "x"))
+                // };
+
+                let active = Some(Bool::fresh_const(ctx, "x"));
 
                 Token {
                     active,

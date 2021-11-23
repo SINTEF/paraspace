@@ -2,6 +2,7 @@ pub mod problem;
 pub mod tokensolver;
 mod multiplicity;
 pub mod transitionsolver;
+pub mod cores;
 // mod cores;
 
 pub fn print_calc_time<T>(name: &str, f: impl FnOnce() -> T) -> T{

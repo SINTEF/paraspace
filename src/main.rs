@@ -36,8 +36,12 @@ fn main() {
     };
 
     if let Some(filename) = opt.input {
-        let contents = std::fs::read_to_string(&filename).unwrap();
-        let problem = serde_json::de::from_str::<problem::Problem>(&contents).unwrap();
+        let problem = {
+            let _p = hprof::enter("load_problem");
+            let contents = std::fs::read_to_string(&filename).unwrap();
+            serde_json::de::from_str::<problem::Problem>(&contents).unwrap()
+        };
+
         let result = print_calc_time(filename.to_str().unwrap(), || solver_func(&problem));
         match result {
             Ok(solution) => {
@@ -56,6 +60,8 @@ fn main() {
     } else {
         println!("No problem files given.");
     }
+
+    hprof::profiler().print_timing();
 }
 
 fn perftest() {
