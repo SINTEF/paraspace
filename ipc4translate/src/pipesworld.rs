@@ -1,3 +1,5 @@
+use itertools::Itertools;
+
 use crate::{problem::*, SexpUnwrap};
 use std::collections::{HashMap, HashSet};
 
@@ -25,14 +27,14 @@ pub fn convert_pipesworld_notankage_temporal_deadlines() {
                 let mut objs = stmt[1..].iter().collect::<Vec<_>>();
                 while objs.len() >= 3 {
                     let mut names = Vec::new();
-                    let mut name = objs.remove(0).to_string();
+                    let mut name = objs.remove(0).to_string().to_lowercase();
                     while name != "-" {
                         names.push(name);
-                        name = objs.remove(0).to_string();
+                        name = objs.remove(0).to_string().to_lowercase();
                     }
                     let objtype = objs.remove(0);
                     println!("obj types {}", objtype);
-                    match objtype.to_string().as_str() {
+                    match objtype.to_string().to_lowercase().as_str() {
                         "product" => products.extend(names),
                         _ => panic!(),
                     }
@@ -61,8 +63,8 @@ pub fn convert_pipesworld_notankage_temporal_deadlines() {
                 .unwrap();
 
         let stmts = instance.unwrap_list().iter().collect::<Vec<_>>();
-        assert!(stmts[0].unwrap_atom().to_string() == "define");
-        assert!(stmts[1].unwrap_list()[0].to_string() == "problem");
+        assert!(stmts[0].unwrap_atom().to_string().to_lowercase() == "define");
+        assert!(stmts[1].unwrap_list()[0].to_string().to_lowercase() == "problem");
         let problem_name = stmts[1].unwrap_list()[1].to_string();
         println!("Problem name: {}", problem_name);
 
@@ -87,22 +89,22 @@ pub fn convert_pipesworld_notankage_temporal_deadlines() {
 
         for stmt in stmts[2..].iter() {
             let stmt = stmt.unwrap_list();
-            match stmt[0].unwrap_atom().to_string().as_str() {
+            match stmt[0].unwrap_atom().to_string().to_lowercase().as_str() {
                 ":domain" => {
-                    assert!(stmt[1].unwrap_atom().to_string() == domain_name);
+                    assert!(stmt[1].unwrap_atom().to_string().to_lowercase() == domain_name);
                 }
                 ":objects" => {
                     let mut objs = stmt[1..].iter().collect::<Vec<_>>();
                     while objs.len() >= 3 {
                         let mut names = Vec::new();
-                        let mut name = objs.remove(0).to_string();
+                        let mut name = objs.remove(0).to_string().to_lowercase();
                         while name != "-" {
                             names.push(name);
-                            name = objs.remove(0).to_string();
+                            name = objs.remove(0).to_string().to_lowercase();
                         }
                         let objtype = objs.remove(0);
                         println!("obj types {}", objtype);
-                        match objtype.to_string().as_str() {
+                        match objtype.to_string().to_lowercase().as_str() {
                             "batch-atom" => batch_atoms.extend(names),
                             "area" => areas.extend(names),
                             "pipe" => pipes.extend(names),
@@ -146,8 +148,8 @@ pub fn convert_pipesworld_notankage_temporal_deadlines() {
                                 stmt[1].unwrap_atom().to_string().to_lowercase(),
                                 stmt[2].unwrap_atom().to_string().to_lowercase(),
                             )),
-                            "unitary" => unitary.push((stmt[1].unwrap_atom().to_string().to_lowercase(),)),
-                            "not-unitary" => not_unitary.push((stmt[1].unwrap_atom().to_string().to_lowercase(),)),
+                            "unitary" => unitary.push(stmt[1].unwrap_atom().to_string().to_lowercase()),
+                            "not-unitary" => not_unitary.push(stmt[1].unwrap_atom().to_string().to_lowercase()),
                             "=" => {
                                 let lhs = stmt[1].unwrap_list();
                                 let rhs = match stmt[2].unwrap_atom() {
@@ -156,13 +158,10 @@ pub fn convert_pipesworld_notankage_temporal_deadlines() {
                                     _ => panic!(),
                                 };
 
-                                match lhs[0].unwrap_atom().to_string().as_str() {
+                                match lhs[0].unwrap_atom().to_string().to_lowercase().as_str() {
                                     "speed" => {
                                         println!("Speed {}", stmt[1].to_string());
-                                        speed.push((
-                                            lhs[1].unwrap_atom().to_string().to_lowercase(),
-                                            rhs,
-                                        ));
+                                        speed.push((lhs[1].unwrap_atom().to_string().to_lowercase(), rhs));
                                     }
                                     _ => panic!(),
                                 };
@@ -183,14 +182,13 @@ pub fn convert_pipesworld_notankage_temporal_deadlines() {
                                 //     false
                                 // };
 
-
                                 match expr[0].unwrap_atom().to_string().as_str() {
                                     "not" => {
                                         let v = expr[1].unwrap_list();
-                                        match v[0].unwrap_atom().to_string().as_str() {
+                                        match v[0].unwrap_atom().to_string().to_lowercase().as_str() {
                                             "deliverable" => {
-                                                not_deliverable.push((v[1].unwrap_atom().to_string(), t));
-                                            },
+                                                not_deliverable.push((v[1].unwrap_atom().to_string().to_lowercase(), t));
+                                            }
                                             _ => panic!(),
                                         }
                                     }
@@ -228,41 +226,212 @@ pub fn convert_pipesworld_notankage_temporal_deadlines() {
             }
         }
 
-        
         println!("{} pipes {} goals", pipes.len(), on_goal.len());
 
+        // Problem interpretation
+        //
+
+        let mut timelines: HashMap<String, Vec<TokenType>> = HashMap::new();
+        let mut statictokens = Vec::new();
+
+        for batch in batch_atoms.iter() {
+            let tl_name = batch.clone();
+            let mut values = Vec::new();
+
+            for area in areas.iter() {
+                values.push(TokenType {
+                    duration: (1, None),
+                    name: area.clone(),
+                    capacity: 0,
+                    conditions: vec![],
+                })
+            }
+
+            for pipe in pipes.iter() {
+                println!("{:?} piep {:?} connect", pipes, connect);
+                let (a, b) = connect
+                    .iter()
+                    .find_map(|(a, b, p)| (p == pipe).then(|| (a, b)))
+                    .unwrap();
+
+                values.push(TokenType {
+                    duration: (1, None),
+                    name: pipe.clone(),
+                    capacity: 0,
+                    conditions: vec![
+                        // Condition {
+                        //     amount: 0,
+                        //     object: ObjectSet::Object(tl_name.clone()),
+                        //     value: a.clone(),
+                        //     temporal_relationship: TemporalRelationship::MetBy,
+                        // },
+                        // Condition {
+                        //     amount: 0,
+                        //     object: ObjectSet::Object(tl_name.clone()),
+                        //     value: b.clone(),
+                        //     temporal_relationship: TemporalRelationship::Meets,
+                        // }
+                    ],
+                });
+            }
+
+            timelines.insert(tl_name, values);
+        }
 
         // let mut batch_atoms = Vec::new();
         // let mut areas = Vec::new();
         // let mut pipes = Vec::new();
-
-        // let mut deliverable = Vec::new();
-        // let mut normal = Vec::new();
-        // let mut may_interface = Vec::new();
-        // let mut connect = Vec::new();
-        // let mut is_product = Vec::new();
         // let mut on = Vec::new();
-        
+
+        for (batch, area) in on.iter() {
+            statictokens.push(Token {
+                capacity: 0,
+                const_time: TokenTime::Fact(None, None),
+                timeline_name: batch.clone(),
+                value: area.clone(),
+            });
+        }
+
+        // all batches should be deliverable in the beginning
+        assert!(deliverable.iter().collect::<HashSet<_>>() == batch_atoms.iter().collect::<HashSet<_>>());
+        println!("not_deliverable {:?}", not_deliverable);
+        // let mut deliverable = Vec::new();
+        // let mut not_deliverable = Vec::new();
+
+        for batch in deliverable.iter() {
+            let deadline = not_deliverable
+                .iter()
+                .find_map(|(b, t)| (b == batch).then(|| t))
+                .map(|d| (d * 1000. + 0.5) as usize);
+
+            statictokens.push(Token {
+                capacity: 0,
+                const_time: TokenTime::Fact(Some(0), deadline),
+                timeline_name: format!("deliverable_{}", batch),
+                value: "Yes".to_string(),
+            });
+        }
+
+        // Recreate the contents of each pipe from the first/last/follow relations
         // let mut first = Vec::new();
         // let mut last = Vec::new();
         // let mut follow = Vec::new();
 
+        let mut pipe_state: HashMap<&String, Vec<&String>> = HashMap::new();
+        for (batch, pipe) in first.iter() {
+            assert!(pipe_state.insert(pipe, vec![batch]).is_none());
+        }
+
+        for (batch, prev_batch) in follow.iter() {
+            let pipe = *pipe_state
+                .iter()
+                .find_map(|(p, s)| (s.last() == Some(&prev_batch)).then(|| p))
+                .unwrap();
+
+            pipe_state.get_mut(pipe).unwrap().push(batch);
+        }
+
+        for (batch, pipe) in last.iter() {
+            println!("{:?}    {}", pipe_state, pipe);
+            assert!(pipe_state[pipe].last() == Some(&batch));
+        }
+
+        // unitary-nonunitary matches pipe_state lengths
         // let mut unitary = Vec::new();
         // let mut not_unitary = Vec::new();
 
+        assert!(pipe_state.iter().all(|(p, s)| if s.len() == 1 {
+            unitary.iter().any(|u| *p == u)
+        } else {
+            not_unitary.iter().any(|u| *p == u)
+        }));
+
+        println!("pipe states {:?}", pipe_state);
+
+        let may_interface_set = may_interface
+            .iter()
+            .map(|(a, b)| (a, b))
+            .collect::<HashSet<(&String, &String)>>();
+        let is_product_map = is_product
+            .iter()
+            .map(|(a, b)| (a, b))
+            .collect::<HashMap<&String, &String>>();
+
+        // Dynamic pipe states
+        for pipe in pipes.iter() {
+            let tl_name = pipe.clone();
+            let mut values = Vec::new();
+
+            statictokens.push(Token {
+                capacity: 0,
+                const_time: TokenTime::Fact(Some(0), None),
+                timeline_name: tl_name.clone(),
+                value: pipe_state[pipe]
+                    .iter()
+                    .copied()
+                    .cloned()
+                    .collect::<Vec<String>>()
+                    .join(";"),
+            });
+
+            let mut n = 0;
+            'permutations: for bs in batch_atoms.iter().permutations(pipe_state[pipe].len()) {
+                // Check if the itnerfaces are ok
+
+                for (b1, b2) in bs.iter().zip(bs.iter().skip(1)) {
+                    let product1 = is_product_map[b1];
+                    let product2 = is_product_map[b2];
+                    if !may_interface_set.contains(&(product1, product2)) {
+                        continue 'permutations;
+                    }
+                }
+
+                let value = bs.iter().copied().cloned().collect::<Vec<String>>().join(";");
+
+                values.push(TokenType {
+                    name: value,
+                    capacity: 0,
+                    conditions: vec![],
+                    duration: (1, None),
+                });
+
+                n += 1;
+            }
+
+            println!("piep {} ahs {} states", pipe, n);
+
+            assert!(timelines.insert(tl_name, values).is_none());
+        }
+
+        // let mut normal = Vec::new();
+        // let mut may_interface = Vec::new();
+        // let mut connect = Vec::new();
+        // let mut is_product = Vec::new();
         // let mut speed = Vec::new();
         // let mut on_goal = Vec::new();
-        // let mut not_deliverable = Vec::new();
 
+        for (batch, area) in on_goal.iter() {
+            statictokens.push(Token {
+                capacity: 0,
+                const_time: TokenTime::Goal,
+                timeline_name: batch.clone(),
+                value: area.clone(),
+            });
+        }
 
-
-        // Problem interpretation
-        // 
-
-
-
-        // let problem = todo!();
-        // let json = serde_json::to_string(&problem).unwrap();
-        // std::fs::write(&format!("satellite_{}.json", file.file_name().to_str().unwrap()), &json).unwrap();
+        let problem = Problem {
+            groups: Vec::new(),
+            timelines: timelines
+                .into_iter()
+                .map(|(n, v)| Timeline { name: n, values: v })
+                .collect(),
+            tokens: statictokens,
+        };
+        let json = serde_json::to_string(&problem).unwrap();
+        std::fs::write(
+            &format!("pipesworld_{}.json", file.file_name().to_str().unwrap()),
+            &json,
+        )
+        .unwrap();
     }
 }

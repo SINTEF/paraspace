@@ -9,8 +9,8 @@ use sexp::Sexp;
 use crate::problem::*;
 
 fn main() {
-    // pipesworld::convert_pipesworld_notankage_temporal_deadlines();
-    satellite::convert_satellites();
+    pipesworld::convert_pipesworld_notankage_temporal_deadlines();
+    // satellite::convert_satellites();
 }
 
 trait SexpUnwrap {
