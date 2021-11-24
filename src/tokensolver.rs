@@ -1,11 +1,9 @@
-use crate::{SolverError, from_z3_real};
+use crate::{from_z3_real, SolverError};
 use z3::ast::Ast;
 use z3::ast::{Bool, Real};
 
 use crate::{multiplicity::multiplicity_one, problem::*};
 use std::collections::HashMap;
-
-
 
 pub fn solve(problem: &Problem) -> Result<Solution, SolverError> {
     println!("Starting pure-token-based solver.");
@@ -338,6 +336,11 @@ pub fn solve(problem: &Problem) -> Result<Solution, SolverError> {
                         let choose_link = Bool::fresh_const(&ctx, "cl");
 
                         let temporal_rel = match link.linkspec.temporal_relationship {
+                            TemporalRelationship::MetByTransitionFrom => vec![Real::_eq(
+                                tokens[token_idx].end_time.as_ref().unwrap(),
+                                token.start_time.as_ref().unwrap(),
+                            )], // TODO this does not take into account that the target token's timeline must transition to some other value.
+
                             TemporalRelationship::MetBy => vec![Real::_eq(
                                 tokens[token_idx].end_time.as_ref().unwrap(),
                                 token.start_time.as_ref().unwrap(),
@@ -356,12 +359,12 @@ pub fn solve(problem: &Problem) -> Result<Solution, SolverError> {
                         };
 
                         if link.linkspec.amount > 0 {
-                        // println!("Link has amount {:?}", link.linkspec);
+                            // println!("Link has amount {:?}", link.linkspec);
                             // Add resource constraint for this token.
-                        let rc = resource_constraints.entry(token_idx).or_default();
-                        assert!(!rc.closed);
-                        rc.users
-                            .push((choose_link.clone(), link.token_idx, link.linkspec.amount));
+                            let rc = resource_constraints.entry(token_idx).or_default();
+                            assert!(!rc.closed);
+                            rc.users
+                                .push((choose_link.clone(), link.token_idx, link.linkspec.amount));
                         }
 
                         // The choose_link boolean implies all the condntions.
@@ -606,7 +609,6 @@ pub fn solve(problem: &Problem) -> Result<Solution, SolverError> {
     }
 }
 
-
 struct Link<'a, 'z3> {
     token_idx: usize,
     linkspec: &'a Condition,
@@ -622,7 +624,6 @@ struct Token<'a, 'z3> {
     active: Bool<'z3>,
     fact: bool,
 }
-
 
 #[derive(Default)]
 struct ResourceConstraint<'z3> {

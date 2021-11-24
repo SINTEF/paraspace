@@ -67,9 +67,11 @@ impl Condition {
 #[derive(Serialize, Deserialize, Debug)]
 pub enum TemporalRelationship {
     MetBy,
+    MetByTransitionFrom,
     Meets,
     Cover,
 }
+
 
 #[derive(Serialize, Deserialize, Debug, Clone, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub enum ObjectSet {

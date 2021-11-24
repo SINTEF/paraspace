@@ -12,7 +12,9 @@ transitions = [
 ]
 
 s = Solver()
-state_sequence = [{ initial: FreshBool() }]
+state_sequence = [
+    { initial: FreshBool() }
+]
 s.add(state_sequence[-1][initial])
 
 while True:

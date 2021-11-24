@@ -63,6 +63,7 @@ impl Condition {
 #[derive(Serialize, Deserialize, Debug)]
 pub enum TemporalRelationship {
     MetBy,
+    MetByTransitionFrom,
     Meets,
     Cover,
 }

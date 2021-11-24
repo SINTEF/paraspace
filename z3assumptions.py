@@ -29,7 +29,7 @@ print(s.unsat_core())
 # a,b,c,d
 #
 # a, x1
-# !x1, b, x2
+# !x1, b1, b2, b3, b4, x2
 # !x2, c, x3
 # !x3, d
 #

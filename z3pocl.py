@@ -24,6 +24,7 @@ def solve(conditions, goal):
         "end": FreshReal(),
     })
     tokens_by_name[goal] = [tokens[0]]
+    conditions = []
 
     extension_literals = {}
 

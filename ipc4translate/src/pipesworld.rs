@@ -187,7 +187,8 @@ pub fn convert_pipesworld_notankage_temporal_deadlines() {
                                         let v = expr[1].unwrap_list();
                                         match v[0].unwrap_atom().to_string().to_lowercase().as_str() {
                                             "deliverable" => {
-                                                not_deliverable.push((v[1].unwrap_atom().to_string().to_lowercase(), t));
+                                                not_deliverable
+                                                    .push((v[1].unwrap_atom().to_string().to_lowercase(), t));
                                             }
                                             _ => panic!(),
                                         }
@@ -234,64 +235,6 @@ pub fn convert_pipesworld_notankage_temporal_deadlines() {
         let mut timelines: HashMap<String, Vec<TokenType>> = HashMap::new();
         let mut statictokens = Vec::new();
 
-        for batch in batch_atoms.iter() {
-            let tl_name = batch.clone();
-            let mut values = Vec::new();
-
-            for area in areas.iter() {
-                values.push(TokenType {
-                    duration: (1, None),
-                    name: area.clone(),
-                    capacity: 0,
-                    conditions: vec![],
-                })
-            }
-
-            for pipe in pipes.iter() {
-                println!("{:?} piep {:?} connect", pipes, connect);
-                let (a, b) = connect
-                    .iter()
-                    .find_map(|(a, b, p)| (p == pipe).then(|| (a, b)))
-                    .unwrap();
-
-                values.push(TokenType {
-                    duration: (1, None),
-                    name: pipe.clone(),
-                    capacity: 0,
-                    conditions: vec![
-                        // Condition {
-                        //     amount: 0,
-                        //     object: ObjectSet::Object(tl_name.clone()),
-                        //     value: a.clone(),
-                        //     temporal_relationship: TemporalRelationship::MetBy,
-                        // },
-                        // Condition {
-                        //     amount: 0,
-                        //     object: ObjectSet::Object(tl_name.clone()),
-                        //     value: b.clone(),
-                        //     temporal_relationship: TemporalRelationship::Meets,
-                        // }
-                    ],
-                });
-            }
-
-            timelines.insert(tl_name, values);
-        }
-
-        // let mut batch_atoms = Vec::new();
-        // let mut areas = Vec::new();
-        // let mut pipes = Vec::new();
-        // let mut on = Vec::new();
-
-        for (batch, area) in on.iter() {
-            statictokens.push(Token {
-                capacity: 0,
-                const_time: TokenTime::Fact(None, None),
-                timeline_name: batch.clone(),
-                value: area.clone(),
-            });
-        }
-
         // all batches should be deliverable in the beginning
         assert!(deliverable.iter().collect::<HashSet<_>>() == batch_atoms.iter().collect::<HashSet<_>>());
         println!("not_deliverable {:?}", not_deliverable);
@@ -336,6 +279,157 @@ pub fn convert_pipesworld_notankage_temporal_deadlines() {
             assert!(pipe_state[pipe].last() == Some(&batch));
         }
 
+        for batch in batch_atoms.iter() {
+            let tl_name = batch.clone();
+            let mut values = Vec::new();
+
+            for area in areas.iter() {
+                values.push(TokenType {
+                    duration: (1, None),
+                    name: area.clone(),
+                    capacity: 0,
+                    conditions: vec![],
+                })
+            }
+
+            for pipe in pipes.iter() {
+                values.push(TokenType {
+                    duration: (1, None),
+                    name: pipe.clone(),
+                    capacity: 0,
+                    conditions: vec![],
+                })
+            }
+
+            for pipe in pipes.iter() {
+                println!("{:?} piep {:?} connect", pipes, connect);
+                let (a, b) = connect
+                    .iter()
+                    .find_map(|(a, b, p)| (p == pipe).then(|| (a, b)))
+                    .unwrap();
+
+                let pipe_a = format!("{}_part{}", pipe, 0);
+                let pipe_b = format!("{}_part{}", pipe, pipe_state[pipe].len() - 1);
+
+                values.push(TokenType {
+                    duration: (1, None),
+                    name: format!("{}-{}", a, pipe),
+                    capacity: 0,
+                    conditions: vec![
+                        Condition {
+                            amount: 0,
+                            object: ObjectSet::Object(tl_name.clone()),
+                            value: a.clone(),
+                            temporal_relationship: TemporalRelationship::MetBy,
+                        },
+                        Condition {
+                            amount: 0,
+                            object: ObjectSet::Object(tl_name.clone()),
+                            value: pipe.clone(),
+                            temporal_relationship: TemporalRelationship::Meets,
+                        },
+                        Condition {
+                            amount: 0,
+                            object: ObjectSet::Object(pipe_a.clone()),
+                            value: batch.clone(),
+                            temporal_relationship: TemporalRelationship::Meets,
+                        },
+                    ],
+                });
+                values.push(TokenType {
+                    duration: (1, None),
+                    name: format!("{}-{}", pipe, a),
+                    capacity: 0,
+                    conditions: vec![
+                        Condition {
+                            amount: 0,
+                            object: ObjectSet::Object(tl_name.clone()),
+                            value: pipe.clone(),
+                            temporal_relationship: TemporalRelationship::MetBy,
+                        },
+                        Condition {
+                            amount: 0,
+                            object: ObjectSet::Object(tl_name.clone()),
+                            value: a.clone(),
+                            temporal_relationship: TemporalRelationship::Meets,
+                        },
+                        Condition {
+                            amount: 0,
+                            object: ObjectSet::Object(pipe_a.clone()),
+                            value: batch.clone(),
+                            temporal_relationship: TemporalRelationship::MetByTransitionFrom,
+                        },
+                    ],
+                });
+                values.push(TokenType {
+                    duration: (1, None),
+                    name: format!("{}-{}", pipe, b),
+                    capacity: 0,
+                    conditions: vec![
+                        Condition {
+                            amount: 0,
+                            object: ObjectSet::Object(tl_name.clone()),
+                            value: pipe.clone(),
+                            temporal_relationship: TemporalRelationship::MetBy,
+                        },
+                        Condition {
+                            amount: 0,
+                            object: ObjectSet::Object(tl_name.clone()),
+                            value: b.clone(),
+                            temporal_relationship: TemporalRelationship::Meets,
+                        },
+                        Condition {
+                            amount: 0,
+                            object: ObjectSet::Object(pipe_b.clone()),
+                            value: batch.clone(),
+                            temporal_relationship: TemporalRelationship::MetByTransitionFrom,
+                        },
+                    ],
+                });
+                values.push(TokenType {
+                    duration: (1, None),
+                    name: format!("{}-{}", b, pipe),
+                    capacity: 0,
+                    conditions: vec![
+                        Condition {
+                            amount: 0,
+                            object: ObjectSet::Object(tl_name.clone()),
+                            value: b.clone(),
+                            temporal_relationship: TemporalRelationship::MetBy,
+                        },
+                        Condition {
+                            amount: 0,
+                            object: ObjectSet::Object(tl_name.clone()),
+                            value: pipe.clone(),
+                            temporal_relationship: TemporalRelationship::Meets,
+                        },
+                        Condition {
+                            amount: 0,
+                            object: ObjectSet::Object(pipe_b.clone()),
+                            value: batch.clone(),
+                            temporal_relationship: TemporalRelationship::Meets,
+                        },
+                    ],
+                });
+            }
+
+            timelines.insert(tl_name, values);
+        }
+
+        // let mut batch_atoms = Vec::new();
+        // let mut areas = Vec::new();
+        // let mut pipes = Vec::new();
+        // let mut on = Vec::new();
+
+        for (batch, area) in on.iter() {
+            statictokens.push(Token {
+                capacity: 0,
+                const_time: TokenTime::Fact(None, None),
+                timeline_name: batch.clone(),
+                value: area.clone(),
+            });
+        }
+
         // unitary-nonunitary matches pipe_state lengths
         // let mut unitary = Vec::new();
         // let mut not_unitary = Vec::new();
@@ -357,51 +451,230 @@ pub fn convert_pipesworld_notankage_temporal_deadlines() {
             .map(|(a, b)| (a, b))
             .collect::<HashMap<&String, &String>>();
 
-        // Dynamic pipe states
-        for pipe in pipes.iter() {
-            let tl_name = pipe.clone();
-            let mut values = Vec::new();
+        let mut prev_location = HashMap::new();
+        let mut next_location = HashMap::new();
+        for (l1, l2, pipe) in connect.iter() {
+            let pipe_speed = speed.iter().find_map(|(p, s)| (p == pipe).then(|| s)).unwrap();
 
-            statictokens.push(Token {
-                capacity: 0,
-                const_time: TokenTime::Fact(Some(0), None),
-                timeline_name: tl_name.clone(),
-                value: pipe_state[pipe]
-                    .iter()
-                    .copied()
-                    .cloned()
-                    .collect::<Vec<String>>()
-                    .join(";"),
-            });
+            let mut locations = vec![Err(l1.clone())];
+            for part in 0..pipe_state[pipe].len() {
+                let name = format!("{}_part{}", pipe, part);
+                locations.push(Ok(name.clone()));
+            }
+            locations.push(Err(l2.clone()));
 
-            let mut n = 0;
-            'permutations: for bs in batch_atoms.iter().permutations(pipe_state[pipe].len()) {
-                // Check if the itnerfaces are ok
+            for (l1, l2) in locations.iter().zip(locations.iter().skip(1)) {
+                if let Ok(a) = l1 {
+                    next_location.insert(a.clone(), l2.clone());
+                }
+                if let Ok(b) = l2 {
+                    prev_location.insert(b.clone(), l1.clone());
+                }
+            }
 
-                for (b1, b2) in bs.iter().zip(bs.iter().skip(1)) {
-                    let product1 = is_product_map[b1];
-                    let product2 = is_product_map[b2];
-                    if !may_interface_set.contains(&(product1, product2)) {
-                        continue 'permutations;
+            for part in 0..pipe_state[pipe].len() {
+                let name = format!("{}_part{}", pipe, part);
+                let prev = &prev_location[&name];
+                let next = &next_location[&name];
+
+                statictokens.push(Token {
+                    capacity: 0,
+                    const_time: TokenTime::Fact(Some(0), None),
+                    timeline_name: name.clone(),
+                    value: pipe_state[pipe][part].clone(),
+                });
+                statictokens.push(Token {
+                    capacity: 0,
+                    const_time: TokenTime::Fact(Some(0), None),
+                    timeline_name: pipe_state[pipe][part].clone(),
+                    value: pipe.clone(),
+                });
+
+                let mut values = Vec::new();
+
+                for batch in batch_atoms.iter() {
+                    values.push(TokenType {
+                        capacity: 0,
+                        conditions: vec![],
+                        duration: (1, None),
+                        name: batch.clone(),
+                    });
+                }
+
+                for b1 in batch_atoms.iter() {
+                    for b2 in batch_atoms.iter() {
+                        if b1 == b2 {
+                            continue;
+                        }
+                        let product1 = is_product_map[b1];
+                        let product2 = is_product_map[b2];
+                        if !may_interface_set.contains(&(product1, product2)) {
+                            continue;
+                        }
+
+                        let dur = ((1.0 / pipe_speed) * 1000.0 + 0.5) as usize;
+
+                        let c_prevstate = Condition {
+                            amount: 0,
+                            object: ObjectSet::Object(name.clone()),
+                            temporal_relationship: TemporalRelationship::MetBy,
+                            value: b1.clone(),
+                        };
+
+                        let c_nextstate = Condition {
+                            amount: 0,
+                            object: ObjectSet::Object(name.clone()),
+                            temporal_relationship: TemporalRelationship::Meets,
+                            value: b2.clone(),
+                        };
+
+                        let c_prevpart_f = match prev {
+                            Ok(part) => Condition {
+                                amount: 0,
+                                object: ObjectSet::Object(part.clone()),
+                                temporal_relationship: TemporalRelationship::MetByTransitionFrom,
+                                value: b2.clone(),
+                            },
+                            Err(area) => Condition {
+                                amount: 0,
+                                object: ObjectSet::Object(b2.clone()),
+                                temporal_relationship: TemporalRelationship::MetByTransitionFrom,
+                                value: area.clone(),
+                            },
+                        };
+
+                        let c_nextpart_f = match next {
+                            Ok(part) => vec![Condition {
+                                amount: 0,
+                                object: ObjectSet::Object(part.clone()),
+                                temporal_relationship: TemporalRelationship::Meets,
+                                value: b1.clone(),
+                            }],
+                            Err(area) => vec![
+                                Condition {
+                                    amount: 0,
+                                    object: ObjectSet::Object(b1.clone()),
+                                    temporal_relationship: TemporalRelationship::Meets,
+                                    value: area.clone(),
+                                },
+                                Condition {
+                                    amount: 0,
+                                    object: ObjectSet::Object(format!("deliverable_{}", b1)),
+                                    temporal_relationship: TemporalRelationship::Cover,
+                                    value: "Yes".to_string(),
+                                },
+                            ],
+                        };
+
+                        let c_prevpart_b = match next {
+                            Ok(part) => Condition {
+                                amount: 0,
+                                object: ObjectSet::Object(part.clone()),
+                                temporal_relationship: TemporalRelationship::MetByTransitionFrom,
+                                value: b2.clone(),
+                            },
+                            Err(area) => Condition {
+                                amount: 0,
+                                object: ObjectSet::Object(b2.clone()),
+                                temporal_relationship: TemporalRelationship::MetByTransitionFrom,
+                                value: area.clone(),
+                            },
+                        };
+
+                        let c_nextpart_b = match prev {
+                            Ok(part) => vec![Condition {
+                                amount: 0,
+                                object: ObjectSet::Object(part.clone()),
+                                temporal_relationship: TemporalRelationship::Meets,
+                                value: b1.clone(),
+                            }],
+                            Err(area) => vec![
+                                Condition {
+                                    amount: 0,
+                                    object: ObjectSet::Object(b1.clone()),
+                                    temporal_relationship: TemporalRelationship::Meets,
+                                    value: area.clone(),
+                                },
+                                Condition {
+                                    amount: 0,
+                                    object: ObjectSet::Object(format!("deliverable_{}", b1)),
+                                    temporal_relationship: TemporalRelationship::Cover,
+                                    value: "Yes".to_string(),
+                                },
+                            ],
+                        };
+
+                        // EXCHANGE FORWARD
+                        let mut forward_conditions = vec![c_prevstate.clone(), c_nextstate.clone(), c_prevpart_f];
+                        forward_conditions.extend(c_nextpart_f);
+                        values.push(TokenType {
+                            name: format!("{}--{}--forward", b1, b2),
+                            capacity: 0,
+                            conditions: forward_conditions,
+                            duration: (dur, Some(dur)),
+                        });
+
+                        // EXCHANGE BACKWARD
+                        let mut backward_conditions = vec![c_prevstate, c_nextstate, c_prevpart_b];
+                        backward_conditions.extend(c_nextpart_b);
+                        values.push(TokenType {
+                            name: format!("{}--{}--backward", b1, b2),
+                            capacity: 0,
+                            conditions: backward_conditions,
+                            duration: (dur, Some(dur)),
+                        });
                     }
                 }
 
-                let value = bs.iter().copied().cloned().collect::<Vec<String>>().join(";");
-
-                values.push(TokenType {
-                    name: value,
-                    capacity: 0,
-                    conditions: vec![],
-                    duration: (1, None),
-                });
-
-                n += 1;
+                timelines.insert(name, values);
             }
-
-            println!("piep {} ahs {} states", pipe, n);
-
-            assert!(timelines.insert(tl_name, values).is_none());
         }
+
+        // // Dynamic pipe states
+        // for pipe in pipes.iter() {
+        //     let tl_name = pipe.clone();
+        //     let mut values = Vec::new();
+
+        //     statictokens.push(Token {
+        //         capacity: 0,
+        //         const_time: TokenTime::Fact(Some(0), None),
+        //         timeline_name: tl_name.clone(),
+        //         value: pipe_state[pipe]
+        //             .iter()
+        //             .copied()
+        //             .cloned()
+        //             .collect::<Vec<String>>()
+        //             .join(";"),
+        //     });
+
+        //     let mut n = 0;
+        //     'permutations: for bs in batch_atoms.iter().permutations(pipe_state[pipe].len()) {
+        //         // Check if the itnerfaces are ok
+
+        //         for (b1, b2) in bs.iter().zip(bs.iter().skip(1)) {
+        //             let product1 = is_product_map[b1];
+        //             let product2 = is_product_map[b2];
+        //             if !may_interface_set.contains(&(product1, product2)) {
+        //                 continue 'permutations;
+        //             }
+        //         }
+
+        //         let value = bs.iter().copied().cloned().collect::<Vec<String>>().join(";");
+
+        //         values.push(TokenType {
+        //             name: value,
+        //             capacity: 0,
+        //             conditions: vec![],
+        //             duration: (1, None),
+        //         });
+
+        //         n += 1;
+        //     }
+
+        //     println!("piep {} ahs {} states", pipe, n);
+
+        //     assert!(timelines.insert(tl_name, values).is_none());
+        // }
 
         // let mut normal = Vec::new();
         // let mut may_interface = Vec::new();
