@@ -1,6 +1,7 @@
 mod problem;
 mod satellite;
 mod pipesworld;
+mod airport;
 
 use std::collections::{HashMap, HashSet};
 
@@ -9,8 +10,9 @@ use sexp::Sexp;
 use crate::problem::*;
 
 fn main() {
-    pipesworld::convert_pipesworld_notankage_temporal_deadlines();
+    airport::convert_airport();
     // satellite::convert_satellites();
+    // pipesworld::convert_pipesworld_notankage_temporal_deadlines();
 }
 
 trait SexpUnwrap {
