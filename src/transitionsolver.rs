@@ -40,7 +40,7 @@ struct Timeline<'z> {
     facts_only: bool,
 }
 
-pub fn solve(problem: &Problem) -> Result<Solution, SolverError> {
+pub fn solve(problem: &Problem, minimizecores :bool) -> Result<Solution, SolverError> {
     let _p = hprof::enter("solve");
     let p1 = hprof::enter("prepare");
     // println!("Starting transition-and-pocl solver.");
@@ -522,9 +522,11 @@ pub fn solve(problem: &Problem) -> Result<Solution, SolverError> {
                 // let mut all_target_tokens = Vec::new();
                 // println!("Finding tokens for object set {:?}", &conds[cond_idx].cond_spec.object);
                 let mut new_target_tokens = Vec::new();
+                let _pr1 = hprof::enter("iter potential target tokens");
                 for obj in objects.iter() {
                     // println!("Finding tokens for {}.{}", obj, conds[cond_idx].cond_spec.value);
                     let timeline_idx = timelines_by_name[obj];
+                    
                     let matching_tokens = tokens.iter().enumerate().filter(|(_, t)| {
                         states[t.state].timeline == timeline_idx && t.value == conds[cond_idx].cond_spec.value
                     });
@@ -537,6 +539,9 @@ pub fn solve(problem: &Problem) -> Result<Solution, SolverError> {
                         }
                     }
                 }
+
+                drop(_pr1);
+                let _pr2 = hprof::enter("add target tokens");
 
                 if need_new_token && new_target_tokens.is_empty() {
                     for i in 0..objects.len() {
@@ -586,7 +591,7 @@ pub fn solve(problem: &Problem) -> Result<Solution, SolverError> {
                         }
                     }
                 }
-
+                drop(_pr2);
                 if new_target_tokens.is_empty() {
                     if need_new_token && conds[cond_idx].alternatives_extension.is_none() {
                         // Couldn't generate the first token, this condition can never be fulfilled.
@@ -613,6 +618,8 @@ pub fn solve(problem: &Problem) -> Result<Solution, SolverError> {
                         assert!(expand_links_lits.remove(b).is_some());
                     }
 
+                    let _pr3 = hprof::enter("alternatives can-expand check");
+
                     let can_expand = objects.iter().any(|t| {
                         let idx = timelines_by_name[t];
                         let timeline = &timelines[idx];
@@ -628,6 +635,7 @@ pub fn solve(problem: &Problem) -> Result<Solution, SolverError> {
                                 &conds[cond_idx].cond_spec.value,
                             )
                     });
+                    drop(_pr3);
 
                     // println!(
                     //     "{:?}.{} can_expand={}",
@@ -951,8 +959,8 @@ pub fn solve(problem: &Problem) -> Result<Solution, SolverError> {
                     return Err(SolverError::NoSolution);
                 }
 
-                let use_trim_core = true;
-                let use_minimize_core = true;
+                let use_trim_core = minimizecores;
+                let use_minimize_core = minimizecores;
 
                 if use_trim_core {
                     crate::cores::trim_core(&mut core, &solver, |_| {});

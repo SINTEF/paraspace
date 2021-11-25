@@ -19,6 +19,9 @@ struct Opt {
     /// Use pure token-based representation.
     #[structopt(long = "tokensolver")]
     tokensolver: bool,
+
+    #[structopt(long = "minimizecores")]
+    minimizecores :bool,
 }
 
 fn main() {
@@ -42,7 +45,8 @@ fn main() {
             serde_json::de::from_str::<problem::Problem>(&contents).unwrap()
         };
 
-        let result = print_calc_time(filename.to_str().unwrap(), || solver_func(&problem));
+        let minimizecores = opt.minimizecores;
+        let result = print_calc_time(filename.to_str().unwrap(), || solver_func(&problem, minimizecores));
         match result {
             Ok(solution) => {
                 println!("Solved.");
@@ -91,7 +95,7 @@ fn perftest() {
 
         // println!("Problem:\n{:#?}", problem);
         // println!("Solving...");
-        let result = print_calc_time(&problem_name, || transitionsolver::solve(&problem));
+        let result = print_calc_time(&problem_name, || transitionsolver::solve(&problem, false));
         match result {
             Ok(solution) => {
                 // println!("Success!");
