@@ -41,7 +41,7 @@ for n_pics in [1,2,3,4,5,6,7,8,9]:
             p.fact("Visibility", "Available", start=start, end=end)
         
         loc_timeline = p.timeline("Location", name="loc")
-        p.fact("loc", "At(0)") # Start at location 0
+        p.fact("loc", "At(0)",start=0) # Start at location 0
 
         for loc in locations:
             loc_timeline.state(f"At({loc})")
