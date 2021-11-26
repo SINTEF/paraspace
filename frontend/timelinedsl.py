@@ -13,7 +13,7 @@ class Problem():
     def resource(self, classname, name=None, capacity=0):
         if name is None:
             name = f"{classname}_{len(self.tokens)}"
-        self.tokens.append({ "timeline_name": name, "value": "Available",  "const_time": { "Fact": [None, None] }, "capacity": capacity})
+        self.tokens.append({ "timeline_name": name, "value": "Available",  "const_time": { "Fact": [None, None] }, "capacity": capacity, "conditions": []})
         self.groups[classname].append(name)
 
     def timeline(self, classname, name=None):
@@ -25,10 +25,10 @@ class Problem():
         return timeline
 
     def goal(self, timeline, value, capacity=0):
-        self.tokens.append({"timeline_name": timeline, "value": value, "const_time": { "Goal": None }, "capacity": capacity})
+        self.tokens.append({"timeline_name": timeline, "value": value, "const_time": { "Goal": None }, "capacity": capacity, "conditions": []})
 
     def fact(self, timeline, value, start=None, end=None, capacity=0):
-        self.tokens.append({"timeline_name": timeline, "value": value, "const_time": { "Fact": [start,end] }, "capacity": capacity})
+        self.tokens.append({"timeline_name": timeline, "value": value, "const_time": { "Fact": [start,end] }, "capacity": capacity, "conditions": []})
 
     def to_dict(self):
         return {"groups": [{"name": key, "members": value } for key,value in self.groups.items()],

@@ -22,7 +22,7 @@ pub fn minimize_core<'ctx>(core: &mut Vec<z3::ast::Bool<'ctx>>, solver: &z3::Sol
             }
             i += 1;
         }
-        print(&format!("Finished core minimization."));
+        print(&"Finished core minimization.".to_string());
         break;
     }
 }

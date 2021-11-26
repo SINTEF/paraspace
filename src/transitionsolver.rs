@@ -40,7 +40,7 @@ struct Timeline<'z> {
     facts_only: bool,
 }
 
-pub fn solve(problem: &Problem, minimizecores :bool) -> Result<Solution, SolverError> {
+pub fn solve(problem: &Problem, minimizecores: bool) -> Result<Solution, SolverError> {
     let _p = hprof::enter("solve");
     let p1 = hprof::enter("prepare");
     // println!("Starting transition-and-pocl solver.");
@@ -150,6 +150,16 @@ pub fn solve(problem: &Problem, minimizecores :bool) -> Result<Solution, SolverE
 
             // Facts can have capacities
             resource_constraints.entry(token_idx).or_default().capacity = Some(const_token.capacity);
+
+            // Facts can have conditions
+            for cond_spec in const_token.conditions.iter() {
+                conds.push(Condition {
+                    token_idx,
+                    token_queue: 0,
+                    cond_spec,
+                    alternatives_extension: None,
+                });
+            }
         }
     }
 
@@ -192,6 +202,7 @@ pub fn solve(problem: &Problem, minimizecores :bool) -> Result<Solution, SolverE
     //     }
     // }
 
+    #[allow(unused)]
     let mut n_smt_calls = 0;
 
     // println!("TL names {:?}", timelines_by_name);
@@ -498,7 +509,7 @@ pub fn solve(problem: &Problem, minimizecores :bool) -> Result<Solution, SolverE
             }
 
             drop(p);
-            let p = hprof::enter("expand_conds");
+            let _p = hprof::enter("expand_conds");
             while conds_queue < conds.len() || !expand_links_queue.is_empty() {
                 let (need_new_token, cond_idx) = if conds_queue < conds.len() {
                     let cond_idx = conds_queue;
@@ -526,7 +537,7 @@ pub fn solve(problem: &Problem, minimizecores :bool) -> Result<Solution, SolverE
                 for obj in objects.iter() {
                     // println!("Finding tokens for {}.{}", obj, conds[cond_idx].cond_spec.value);
                     let timeline_idx = timelines_by_name[obj];
-                    
+
                     let matching_tokens = tokens.iter().enumerate().filter(|(_, t)| {
                         states[t.state].timeline == timeline_idx && t.value == conds[cond_idx].cond_spec.value
                     });
@@ -771,7 +782,13 @@ pub fn solve(problem: &Problem, minimizecores :bool) -> Result<Solution, SolverE
                             Some(const_token.value.as_str()),
                         );
 
-                        assert!(expanded, "could not expand timeline until goal.");
+                        if !expanded {
+                            println!(
+                                "could not expand timeline {} until goal {}.",
+                                timeline_names[timeline_idx], const_token.value
+                            );
+                            panic!();
+                        }
                     }
                 }
             }
@@ -953,7 +970,7 @@ pub fn solve(problem: &Problem, minimizecores :bool) -> Result<Solution, SolverE
 
         match result {
             z3::SatResult::Unsat => {
-                let p = hprof::enter("unsat_core");
+                let _p = hprof::enter("unsat_core");
                 let mut core = solver.get_unsat_core();
                 if core.is_empty() {
                     return Err(SolverError::NoSolution);
@@ -1025,7 +1042,7 @@ pub fn solve(problem: &Problem, minimizecores :bool) -> Result<Solution, SolverE
             }
 
             z3::SatResult::Sat => {
-                let p = hprof::enter("extract_solution");
+                let _p = hprof::enter("extract_solution");
                 // println!("SAT after {} solver calls", n_smt_calls);
                 let model = solver.get_model().unwrap();
                 // println!("{}", model.to_string());

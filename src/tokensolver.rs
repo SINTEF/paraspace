@@ -5,7 +5,7 @@ use z3::ast::{Bool, Real};
 use crate::{multiplicity::multiplicity_one, problem::*};
 use std::collections::HashMap;
 
-pub fn solve(problem: &Problem, minimizecores :bool) -> Result<Solution, SolverError> {
+pub fn solve(problem: &Problem, _minimizecores :bool) -> Result<Solution, SolverError> {
     println!("Starting pure-token-based solver.");
     let z3_config = z3::Config::new();
     let ctx = z3::Context::new(&z3_config);
