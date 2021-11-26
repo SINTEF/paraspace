@@ -125,6 +125,9 @@ pub fn solve(problem: &Problem, minimizecores: bool) -> Result<Solution, SolverE
 
             let token_idx = tokens.len();
             let state_idx = states.len();
+            let state_seq = timelines[timelines_by_name[const_token.timeline_name.as_str()]]
+                .states
+                .len();
             tokens.push(Token {
                 active: None,
                 value: &const_token.value,
@@ -132,7 +135,7 @@ pub fn solve(problem: &Problem, minimizecores: bool) -> Result<Solution, SolverE
                 fact: true,
             });
             states.push(State {
-                state_seq: 0,
+                state_seq,
                 tokens: vec![token_idx],
                 start_time: start_time
                     .map(|t| Real::from_real(&ctx, t as i32, 1))
@@ -992,7 +995,7 @@ pub fn solve(problem: &Problem, minimizecores: bool) -> Result<Solution, SolverE
                 for c in core {
                     if let Some(nc) = neg_expansions.get(&c) {
                         if let Some(timeline) = expand_goal_state_lits.get(nc) {
-                            println!("Expand goals in timleine {}", problem.timelines[*timeline].name);
+                            println!("Expand goals in timleine {}", timeline_names[*timeline]);
                             println!(
                                 "  -expand GOALs for {}",
                                 // problem.timelines[states[token.state].timeline].name, token.value, cond.cond_spec
@@ -1002,9 +1005,10 @@ pub fn solve(problem: &Problem, minimizecores: bool) -> Result<Solution, SolverE
                         } else if let Some(cond_idx) = expand_links_lits.get(nc).copied() {
                             let cond = &conds[cond_idx];
                             let token = &tokens[cond.token_idx];
+                            println!("timeline idx {}", states[token.state].timeline);
                             println!(
                                 "  -expand LINK {}.{} {:?}",
-                                problem.timelines[states[token.state].timeline].name, token.value, cond.cond_spec
+                                timeline_names[states[token.state].timeline], token.value, cond.cond_spec
                             );
 
                             // TODO heuristically decide which and how many to expand.s

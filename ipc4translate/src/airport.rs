@@ -180,7 +180,7 @@ pub fn convert_airport() {
 
                                 match lhs[0].unwrap_atom().to_string().to_lowercase().as_str() {
                                     "length" => {
-                                        // println!("Speed {}", stmt[1].to_string());
+                                        // println!("LENGTH {:?}", stmt);
                                         length.push((lhs[1].unwrap_atom().to_string().to_lowercase(), rhs));
                                     }
                                     "engines" => {
@@ -479,7 +479,7 @@ pub fn convert_airport() {
                 } else {
                     0
                 };
-                // println!("node time for name {}", name);
+                // println!("node time for name {} -> {}", name, travel_time);
                 assert!(node_travel_time.insert(name.clone(), travel_time).is_none());
 
                 let occupations = node_conditions.entry(name.clone()).or_default();
@@ -542,22 +542,24 @@ pub fn convert_airport() {
 
                 let travel_time = node_travel_time[&from];
 
-                let action_time = if to.starts_with(park_mode) {
+                let time = if from.starts_with(push_mode) && to.starts_with(move_mode) {
+                    travel_time
+                        + (60.
+                            * engines
+                                .iter()
+                                .find_map(|(a, e)| (a == airplane).then(|| *e))
+                                .unwrap_or(0.)
+                            * time_scale
+                            + 0.5) as usize
+                } else if to.starts_with(park_mode) {
                     40 * (time_scale as usize)
-                } else if to.starts_with(move_mode) {
-                    (60. * engines
-                        .iter()
-                        .find_map(|(a, e)| (a == airplane).then(|| *e))
-                        .unwrap_or(0.)
-                        * time_scale
-                        + 0.5) as usize
                 } else if to.starts_with(airborne_mode) {
                     30 * (time_scale as usize)
                 } else {
-                    0
+                    travel_time
                 };
 
-                let time = travel_time + action_time;
+                // println!("Total time {}->{} ===> {}", from, to, time);
 
                 values.push(TokenType {
                     capacity: 0,
@@ -581,7 +583,15 @@ pub fn convert_airport() {
                 const_time: TokenTime::Fact(Some(0), None),
                 timeline_name: airplane.clone(),
                 value: format!("{}_{}_{}", initial_mode, initial_seg, initial_dir),
-                conditions: vec![],
+                conditions: node_conditions[&format!("{}_{}_{}", initial_mode, initial_seg, initial_dir)]
+                    .iter()
+                    .map(|(occ, exclusive)| Condition {
+                        amount: if *exclusive { 1 } else { 0 },
+                        object: ObjectSet::Object(occ.clone()),
+                        temporal_relationship: TemporalRelationship::Cover,
+                        value: (if *exclusive { "Yes" } else { "No" }).to_string(),
+                    })
+                    .collect(),
             });
         }
 
@@ -613,19 +623,22 @@ pub fn convert_airport() {
         //
         // BLOCKED INTERVALS
         //
-        let mut seg_blocked : HashMap<&String,Vec<(bool,usize)>> = HashMap::new();
-        for (not,seg,plane,time) in blocked_intervals.iter() {
+        let mut seg_blocked: HashMap<&String, Vec<(bool, usize)>> = HashMap::new();
+        for (not, seg, plane, time) in blocked_intervals.iter() {
             assert!(plane.starts_with("dummy"));
-            seg_blocked.entry(seg).or_default().push((*not,(time_scale * (*time) +0.5) as usize));
+            seg_blocked
+                .entry(seg)
+                .or_default()
+                .push((*not, (time_scale * (*time) + 0.5) as usize));
         }
-        
-        for (seg,mut list) in seg_blocked {
-            list.sort_by_key(|(_,t)| *t);
+
+        for (seg, mut list) in seg_blocked {
+            list.sort_by_key(|(_, t)| *t);
             assert!(list.len() % 2 == 0);
-            
+
             while !list.is_empty() {
-                let (n1,t1) = list.remove(0);
-                let (n2,t2) = list.remove(0);
+                let (n1, t1) = list.remove(0);
+                let (n2, t2) = list.remove(0);
                 assert!(!n1 && n2);
 
                 // Blocked in interval t1 - t2
@@ -644,7 +657,6 @@ pub fn convert_airport() {
                 });
             }
         }
-
 
         let problem = Problem {
             groups: Vec::new(),
