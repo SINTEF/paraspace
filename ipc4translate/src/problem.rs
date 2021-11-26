@@ -19,6 +19,7 @@ pub struct Token {
     pub value: String,
     pub capacity: u32,
     pub const_time: TokenTime,
+    pub conditions :Vec<Condition>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -50,18 +51,18 @@ pub struct Condition {
     pub amount: u32,
 }
 
-impl Condition {
-    pub fn is_timeline_transition_from(&self, timeline: &str) -> Option<&str> {
-        (matches!(self.temporal_relationship, TemporalRelationship::MetBy)
-            && self.object == ObjectSet::Object(timeline.to_string()))
-        .then(|| self.value.as_str())
-    }
-    pub fn is_timeline_transition_to(&self, timeline: &str) -> Option<&str> {
-        (matches!(self.temporal_relationship, TemporalRelationship::Meets)
-            && self.object == ObjectSet::Object(timeline.to_string()))
-        .then(|| self.value.as_str())
-    }
-}
+// impl Condition {
+//     pub fn is_timeline_transition_from(&self, timeline: &str) -> Option<&str> {
+//         (matches!(self.temporal_relationship, TemporalRelationship::MetBy)
+//             && self.object == ObjectSet::Object(timeline.to_string()))
+//         .then(|| self.value.as_str())
+//     }
+//     pub fn is_timeline_transition_to(&self, timeline: &str) -> Option<&str> {
+//         (matches!(self.temporal_relationship, TemporalRelationship::Meets)
+//             && self.object == ObjectSet::Object(timeline.to_string()))
+//         .then(|| self.value.as_str())
+//     }
+// }
 
 #[derive(Clone)]
 #[derive(Serialize, Deserialize, Debug)]

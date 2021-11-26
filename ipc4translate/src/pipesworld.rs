@@ -1,5 +1,3 @@
-use itertools::Itertools;
-
 use crate::{problem::*, SexpUnwrap};
 use std::collections::{HashMap, HashSet};
 
@@ -42,10 +40,10 @@ pub fn convert_pipesworld_notankage_temporal_deadlines() {
             }
             ":durative-action" => {
                 // println!("ACTION");
-                let stmt = &stmt[1..];
-                for s in stmt.iter() {
-                    // println!(" {}",s);
-                }
+                // let stmt = &stmt[1..];
+                // for s in stmt.iter() {
+                //     // println!(" {}",s);
+                // }
             }
             _ => {
                 println!("UNKNOWN domain statement {:?}", stmt);
@@ -173,7 +171,7 @@ pub fn convert_pipesworld_notankage_temporal_deadlines() {
                                     sexp::Atom::F(n) => *n,
                                     _ => panic!(),
                                 };
-                                let mut expr = stmt[2].unwrap_list();
+                                let expr = stmt[2].unwrap_list();
 
                                 // let not = if expr[0].unwrap_atom().to_string().as_str().to_lowercase() == "not" {
                                 //     expr = expr[1].unwrap_list();
@@ -252,6 +250,7 @@ pub fn convert_pipesworld_notankage_temporal_deadlines() {
                 const_time: TokenTime::Fact(Some(0), deadline),
                 timeline_name: format!("deliverable_{}", batch),
                 value: "Yes".to_string(),
+                conditions: vec![],
             });
         }
 
@@ -427,6 +426,7 @@ pub fn convert_pipesworld_notankage_temporal_deadlines() {
                 const_time: TokenTime::Fact(None, None),
                 timeline_name: batch.clone(),
                 value: area.clone(),
+                conditions: vec![],
             });
         }
 
@@ -482,12 +482,14 @@ pub fn convert_pipesworld_notankage_temporal_deadlines() {
                     const_time: TokenTime::Fact(Some(0), None),
                     timeline_name: name.clone(),
                     value: pipe_state[pipe][part].clone(),
+                    conditions: vec![],
                 });
                 statictokens.push(Token {
                     capacity: 0,
                     const_time: TokenTime::Fact(Some(0), None),
                     timeline_name: pipe_state[pipe][part].clone(),
                     value: pipe.clone(),
+                    conditions: vec![],
                 });
 
                 let mut values = Vec::new();
@@ -689,6 +691,7 @@ pub fn convert_pipesworld_notankage_temporal_deadlines() {
                 const_time: TokenTime::Goal,
                 timeline_name: batch.clone(),
                 value: area.clone(),
+                conditions: vec![],
             });
         }
 

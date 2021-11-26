@@ -1,5 +1,4 @@
-use itertools::Itertools;
-
+#![allow(clippy::vec_init_then_push)]
 use crate::{problem::*, SexpUnwrap};
 use std::collections::{HashMap, HashSet};
 
@@ -32,17 +31,15 @@ pub fn convert_airport() {
                     }
                     let objtype = objs.remove(0);
                     println!("obj types {}", objtype);
-                    match objtype.to_string().to_lowercase().as_str() {
-                        _ => panic!(),
-                    }
+                    panic!("constant unexpected");
                 }
             }
             ":durative-action" => {
-                // println!("ACTION");
-                let stmt = &stmt[1..];
-                for s in stmt.iter() {
-                    // println!(" {}",s);
-                }
+                // // println!("ACTION");
+                // let stmt = &stmt[1..];
+                // for _ in stmt.iter() {
+                //     // println!(" {}",s);
+                // }
             }
             _ => {
                 println!("UNKNOWN domain statement {:?}", stmt);
@@ -200,7 +197,7 @@ pub fn convert_airport() {
                                     sexp::Atom::F(n) => *n,
                                     _ => panic!(),
                                 };
-                                let mut expr = stmt[2].unwrap_list();
+                                let expr = stmt[2].unwrap_list();
 
                                 let (v, not) = if expr[0].unwrap_atom().to_string().to_lowercase().as_str() == "not" {
                                     (expr[1].unwrap_list(), true)
@@ -280,75 +277,7 @@ pub fn convert_airport() {
         let mut timelines: HashMap<String, Vec<TokenType>> = HashMap::new();
         let mut statictokens = Vec::new();
 
-        for airplane in airplanes.iter() {
-            let tl_name = format!("{}_mode", airplane);
-
-            if is_pushing.iter().any(|a| a == airplane) {
-                statictokens.push(Token {
-                    capacity: 0,
-                    const_time: TokenTime::Fact(None, None),
-                    timeline_name: tl_name.clone(),
-                    value: "pushing".to_string(),
-                });
-            } else if is_moving.iter().any(|a| a == airplane) {
-                statictokens.push(Token {
-                    capacity: 0,
-                    const_time: TokenTime::Fact(None, None),
-                    timeline_name: tl_name.clone(),
-                    value: "moving".to_string(),
-                });
-            } else {
-                // Dummy airplane?
-                println!("dummy {}", airplane);
-                continue;
-            }
-
-            let startup_time = engines.iter().find_map(|(a, t)| (a == airplane).then(|| *t)).unwrap();
-            let startup_time = (1000.0 * startup_time + 0.5) as usize;
-
-            let mut values = vec![
-                TokenType {
-                    capacity: 0,
-                    conditions: vec![],
-                    duration: (startup_time, None),
-                    name: "pushing".to_string(),
-                },
-                TokenType {
-                    capacity: 0,
-                    conditions: vec![Condition {
-                        amount: 0,
-                        object: ObjectSet::Object(tl_name.clone()),
-                        temporal_relationship: TemporalRelationship::MetByTransitionFrom,
-                        value: "pushing".to_string(),
-                    }],
-                    duration: (1, None),
-                    name: "moving".to_string(),
-                },
-                // TokenType {
-                //     capacity: 0,
-                //     conditions: vec![Condition {
-                //         amount: 0,
-                //         object: ObjectSet::Object(tl_name.clone()),
-                //         temporal_relationship: TemporalRelationship::MetByTransitionFrom,
-                //         value: "moving".to_string(),
-                //     }],
-                //     duration: (1, None),
-                //     name: "parked".to_string(),
-                // },
-                // TokenType {
-                //     capacity: 0,
-                //     conditions: vec![Condition {
-                //         amount: 0,
-                //         object: ObjectSet::Object(tl_name.clone()),
-                //         temporal_relationship: TemporalRelationship::MetByTransitionFrom,
-                //         value: "moving".to_string(),
-                //     }],
-                //     duration: (1, None),
-                //     name: "airborne".to_string(),
-                // },
-            ];
-            timelines.insert(tl_name, values);
-        }
+        let time_scale = 1000.0;
 
         assert!(
             directions.iter().map(|d| d.as_str()).collect::<HashSet<_>>()
@@ -357,157 +286,365 @@ pub fn convert_airport() {
 
         // RESOURCES have capacity 1 for airplanes.
         for segment in segments.iter() {
-            for direction in directions.iter() {
-                statictokens.push(Token {
-                    capacity: 1,
-                    const_time: TokenTime::Fact(None, None),
-                    timeline_name: format!("occ_{}_{}", segment, direction),
-                    value: "Available".to_string(),
-                });
-            }
+            // for direction in directions.iter() {
+            let occ_tl = format!("occupied_{}", segment);
+            // let blk_tl = format!("blocked_{}", segment);
+
+            timelines.insert(
+                occ_tl.clone(),
+                vec![
+                    TokenType {
+                        capacity: 0,
+                        conditions: vec![Condition {
+                            amount: 0,
+                            object: ObjectSet::Object(occ_tl.clone()),
+                            temporal_relationship: TemporalRelationship::MetBy,
+                            value: "Yes".to_string(),
+                        }],
+                        duration: (1, None),
+                        name: "No".to_string(),
+                    },
+                    TokenType {
+                        capacity: 1,
+                        conditions: vec![Condition {
+                            amount: 0,
+                            object: ObjectSet::Object(occ_tl.clone()),
+                            temporal_relationship: TemporalRelationship::MetBy,
+                            value: "No".to_string(),
+                        }],
+                        duration: (1, None),
+                        name: "Yes".to_string(),
+                    },
+                ],
+            );
+
+            // timelines.insert(
+            //     blk_tl.clone(),
+            //     vec![
+            //         TokenType {
+            //             capacity: 0,
+            //             conditions: vec![Condition {
+            //                 amount: 0,
+            //                 object: ObjectSet::Object(blk_tl.clone()),
+            //                 temporal_relationship: TemporalRelationship::MetBy,
+            //                 value: "Yes".to_string(),
+            //             }],
+            //             duration: (1, None),
+            //             name: "No".to_string(),
+            //         },
+            //         TokenType {
+            //             capacity: 0,
+            //             conditions: vec![Condition {
+            //                 amount: 0,
+            //                 object: ObjectSet::Object(blk_tl.clone()),
+            //                 temporal_relationship: TemporalRelationship::MetBy,
+            //                 value: "No".to_string(),
+            //             }],
+            //             duration: (1, None),
+            //             name: "Yes".to_string(),
+            //         },
+            //     ],
+            // );
+
+            statictokens.push(Token {
+                capacity: 1,
+                const_time: TokenTime::Fact(Some(0), None),
+                timeline_name: format!("occupied_{}", segment),
+                value: (if occupied.iter().any(|s| s == segment) {
+                    "Yes"
+                } else {
+                    "No"
+                })
+                .to_string(),
+                conditions: vec![],
+            });
+
+            // statictokens.push(Token {
+            //     capacity: 1,
+            //     const_time: TokenTime::Fact(Some(0), None),
+            //     timeline_name: format!("blocked_{}", segment),
+            //     value: (if blocked.iter().any(|(s, _airplane)| s == segment) {
+            //         "Yes"
+            //     } else {
+            //         "No"
+            //     })
+            //     .to_string(),
+            // });
+            // }
         }
 
-        // AIRPLANE PUSHBACK LOCATION
-        for airplane in airplanes.iter() {
-            let tl_name = format!("{}_pushback_loc", airplane);
-            let mut values = Vec::new();
-
-            let airplane_type = has_type.iter().find_map(|(a, t)| (airplane == a).then(|| t)).unwrap();
-
-            for segment in segments.iter() {
-                for direction in directions.iter() {
-                    let location_name = format!("{}_{}", segment, direction);
-                    let travel_time = 5; // TODO
-
-                    let mut conditions = Vec::new();
-
-                    // Need to use the current segment/dir and
-                    // exclude all other uses of incompatible resources
-                    conditions.push(Condition {
-                        amount: 1,
-                        object: ObjectSet::Object(format!("occ_{}_{}", segment, direction)),
-                        temporal_relationship: TemporalRelationship::Cover,
-                        value: "Available".to_string(),
-                    });
-
-                    let this_segment_blocks_other = is_blocked
-                        .iter()
-                        .filter(|(s1, t, _, _)| s1 == segment && t == airplane_type);
-
-                    for (_, _, other_segment, other_dir) in this_segment_blocks_other {
-                        conditions.push(Condition {
-                            amount: 1,
-                            object: ObjectSet::Object(format!("occ_{}_{}", other_segment, other_dir)),
-                            temporal_relationship: TemporalRelationship::Cover,
-                            value: "Available".to_string(),
-                        });
-                    }
-
-                    values.push(TokenType {
-                        capacity: 0,
-                        conditions,
-                        duration: (travel_time, None),
-                        name: location_name.clone(),
-                    });
-
-                    values.push(TokenType {
-                        capacity: 0,
-                        conditions: vec![
-                            Condition {
-                                amount: 0,
-                                object: ObjectSet::Object(tl_name.clone()),
-                                temporal_relationship: TemporalRelationship::MetByTransitionFrom,
-                                value: location_name.clone(),
-                            },
-                            Condition {
-                                amount: 0,
-                                object: ObjectSet::Object(tl_name.clone()),
-                                temporal_relationship: TemporalRelationship::Meets,
-                                value: "pushback_finished".to_string(),
-                            },
-                            Condition {
-                                amount: 0,
-                                object: ObjectSet::Object(format!("{}_mode", airplane)),
-                                temporal_relationship: TemporalRelationship::Meets,
-                                value: "moving".to_string(),
-                            },
-                        ],
-                        duration: (1, None),
-                        name: format!("{}_{}_finishpushback", segment, direction),
-                    })
+        // Assume that runways are unidirectional (simplifies the formulation of the airborne goals).
+        for (a, b) in is_start_runway.iter() {
+            for (c, d) in is_start_runway.iter() {
+                if a == c {
+                    assert!(b == d);
                 }
             }
+        }
+        let push_mode = "Push";
+        let move_mode = "Move";
+        let park_mode = "Parked";
+        let airborne_mode = "Airborne";
 
-            // CAN PUSHBACK: make connections between states
+        for airplane in airplanes.iter() {
+            // We'll make a graph of possible transitions for an airplane
+            let initial_mode = if is_moving.iter().any(|a| airplane == a) {
+                move_mode
+            } else if is_pushing.iter().any(|a| airplane == a) {
+                push_mode
+            } else {
+                assert!(airplane.contains("dummy"));
+                continue;
+            };
 
+            let mut nodes = HashSet::new();
+            let mut edges = Vec::new();
+
+            // PUSHBACK EDGES
             for (from_seg, to_seg, from_dir) in can_pushback.iter() {
                 let to_dir = move_back_dir
                     .iter()
                     .find_map(|(seg1, seg2, dir)| (seg1 == from_seg && seg2 == to_seg).then(|| dir))
                     .unwrap();
 
-                let from_name = format!("{}_{}", from_seg, from_dir);
-                let to_name = format!("{}_{}", to_seg, to_dir);
+                let from_name = format!("{}_{}_{}", push_mode, from_seg, from_dir);
+                let to_name = format!("{}_{}_{}", push_mode, to_seg, to_dir);
+                nodes.insert((push_mode, from_seg, from_dir));
+                nodes.insert((push_mode, to_seg, to_dir));
+                edges.push((from_name, to_name));
+            }
+            // PUSH->MOVE edges
+            for seg in segments.iter() {
+                for dir in directions.iter() {
+                    let from_name = format!("{}_{}_{}", push_mode, seg, dir);
+                    let to_name = format!("{}_{}_{}", move_mode, seg, dir);
+                    nodes.insert((push_mode, seg, dir));
+                    nodes.insert((move_mode, seg, dir));
+                    edges.push((from_name, to_name));
+                }
+            }
+            // MOVE EDGES
+            for (from_seg, to_seg, from_dir) in can_move.iter() {
+                let to_dir = move_dir
+                    .iter()
+                    .find_map(|(seg1, seg2, dir)| (seg1 == from_seg && seg2 == to_seg).then(|| dir))
+                    .unwrap();
+
+                let from_name = format!("{}_{}_{}", move_mode, from_seg, from_dir);
+                let to_name = format!("{}_{}_{}", move_mode, to_seg, to_dir);
+                nodes.insert((move_mode, from_seg, from_dir));
+                nodes.insert((move_mode, to_seg, to_dir));
+                edges.push((from_name, to_name));
+            }
+            // PARK EDGES
+            for seg in segments.iter() {
+                for dir in directions.iter() {
+                    let from_name = format!("{}_{}_{}", move_mode, seg, dir);
+                    let to_name = format!("{}_{}", park_mode, seg);
+                    nodes.insert((move_mode, seg, dir));
+                    nodes.insert((park_mode, seg, dir));
+                    edges.push((from_name, to_name));
+                }
+            }
+            // TAKEOFF EDGES
+            for (seg, dir) in is_start_runway.iter() {
+                let from_name = format!("{}_{}_{}", move_mode, seg, dir);
+                let to_name = format!("{}_{}_{}", airborne_mode, seg, dir);
+                nodes.insert((move_mode, seg, dir));
+                nodes.insert((airborne_mode, seg, dir));
+                edges.push((from_name, to_name));
+            }
+
+            let mut values = Vec::new();
+            let mut node_conditions: HashMap<String, HashMap<String, bool>> = HashMap::new();
+            let mut node_travel_time: HashMap<String, usize> = HashMap::new();
+            let mut added_nodes = HashSet::new();
+            for (mode, seg, dir) in nodes {
+                let name = if mode == park_mode {
+                    format!("{}_{}", park_mode, seg)
+                } else {
+                    format!("{}_{}_{}", mode, seg, dir)
+                };
+
+                if !added_nodes.insert(name.clone()) {
+                    continue;
+                }
+
+                let seg_length = length.iter().find_map(|(s, l)| (s == seg).then(|| *l)).unwrap();
+
+                let travel_time = if mode == push_mode {
+                    ((seg_length / 5.0) * time_scale + 0.5) as usize
+                } else if mode == move_mode {
+                    ((seg_length / 30.0) * time_scale + 0.5) as usize
+                } else {
+                    0
+                };
+                // println!("node time for name {}", name);
+                assert!(node_travel_time.insert(name.clone(), travel_time).is_none());
+
+                let occupations = node_conditions.entry(name.clone()).or_default();
+
+                occupations.insert(format!("occupied_{}", seg), true);
+
+                // Block other resources
+                if mode != park_mode && mode != airborne_mode {
+                    for (other_seg, _airplanetype, this_seg, this_dir) in is_blocked.iter() {
+                        if this_seg == seg && this_dir == dir {
+                            // other_seg is blocked
+                            occupations.entry(format!("occupied_{}", other_seg)).or_default();
+                        }
+                    }
+                }
 
                 values.push(TokenType {
                     capacity: 0,
-                    conditions: vec![
-                        Condition {
-                            amount: 0,
-                            object: ObjectSet::Object(tl_name.clone()),
-                            temporal_relationship: TemporalRelationship::MetByTransitionFrom,
-                            value: from_name,
-                        },
-                        Condition {
-                            amount: 0,
-                            object: ObjectSet::Object(tl_name.clone()),
-                            temporal_relationship: TemporalRelationship::Meets,
-                            value: to_name,
-                        },
-                    ],
+                    conditions: occupations
+                        .iter()
+                        .map(|(occ, exclusive)| Condition {
+                            amount: if *exclusive { 1 } else { 0 },
+                            object: ObjectSet::Object(occ.clone()),
+                            temporal_relationship: TemporalRelationship::Cover,
+                            value: (if *exclusive { "Yes" } else { "No" }).to_string(),
+                        })
+                        .collect(),
                     duration: (1, None),
-                    name: format!("{}_{}--{}_{}", from_seg, from_dir, to_seg, to_dir),
+                    name,
+                })
+            }
+
+            for (from, to) in edges {
+                let mut conditions = vec![
+                    Condition {
+                        value: from.clone(),
+                        amount: 0,
+                        temporal_relationship: TemporalRelationship::MetByTransitionFrom,
+                        object: ObjectSet::Object(airplane.clone()),
+                    },
+                    Condition {
+                        value: to.clone(),
+                        amount: 0,
+                        temporal_relationship: TemporalRelationship::Meets,
+                        object: ObjectSet::Object(airplane.clone()),
+                    },
+                ];
+
+                let mut occupations: HashMap<String, bool> = HashMap::new();
+                for (occ, excl) in node_conditions[&from].iter().chain(node_conditions[&to].iter()) {
+                    *occupations.entry(occ.clone()).or_default() |= *excl;
+                }
+
+                conditions.extend(occupations.iter().map(|(occ, exclusive)| Condition {
+                    amount: if *exclusive { 1 } else { 0 },
+                    object: ObjectSet::Object(occ.clone()),
+                    temporal_relationship: TemporalRelationship::Cover,
+                    value: (if *exclusive { "Yes" } else { "No" }).to_string(),
+                }));
+
+                let travel_time = node_travel_time[&from];
+
+                let action_time = if to.starts_with(park_mode) {
+                    40 * (time_scale as usize)
+                } else if to.starts_with(move_mode) {
+                    (60. * engines
+                        .iter()
+                        .find_map(|(a, e)| (a == airplane).then(|| *e))
+                        .unwrap_or(0.)
+                        * time_scale
+                        + 0.5) as usize
+                } else if to.starts_with(airborne_mode) {
+                    30 * (time_scale as usize)
+                } else {
+                    0
+                };
+
+                let time = travel_time + action_time;
+
+                values.push(TokenType {
+                    capacity: 0,
+                    conditions,
+                    duration: (time.max(1), None),
+                    name: format!("{}->{}", from, to),
+                })
+            }
+
+            timelines.insert(airplane.clone(), values);
+
+            // INITIAL POSITIONS
+            let initial_seg = at_segments
+                .iter()
+                .find_map(|(a, s)| (a == airplane).then(|| s))
+                .unwrap();
+            let initial_dir = facing.iter().find_map(|(a, d)| (a == airplane).then(|| d)).unwrap();
+
+            statictokens.push(Token {
+                capacity: 0,
+                const_time: TokenTime::Fact(Some(0), None),
+                timeline_name: airplane.clone(),
+                value: format!("{}_{}_{}", initial_mode, initial_seg, initial_dir),
+                conditions: vec![],
+            });
+        }
+
+        //
+        // GOALS
+        //
+
+        for (airplane, seg) in goal_parked.iter() {
+            statictokens.push(Token {
+                capacity: 0,
+                const_time: TokenTime::Goal,
+                timeline_name: airplane.to_string(),
+                value: format!("{}_{}", park_mode, seg),
+                conditions: vec![],
+            });
+        }
+
+        for (airplane, seg) in goal_airborne.iter() {
+            let dir = is_start_runway.iter().find_map(|(s, d)| (s == seg).then(|| d)).unwrap();
+            statictokens.push(Token {
+                capacity: 0,
+                const_time: TokenTime::Goal,
+                timeline_name: airplane.to_string(),
+                value: format!("{}_{}_{}", airborne_mode, seg, dir),
+                conditions: vec![],
+            });
+        }
+
+        //
+        // BLOCKED INTERVALS
+        //
+        let mut seg_blocked : HashMap<&String,Vec<(bool,usize)>> = HashMap::new();
+        for (not,seg,plane,time) in blocked_intervals.iter() {
+            assert!(plane.starts_with("dummy"));
+            seg_blocked.entry(seg).or_default().push((*not,(time_scale * (*time) +0.5) as usize));
+        }
+        
+        for (seg,mut list) in seg_blocked {
+            list.sort_by_key(|(_,t)| *t);
+            assert!(list.len() % 2 == 0);
+            
+            while !list.is_empty() {
+                let (n1,t1) = list.remove(0);
+                let (n2,t2) = list.remove(0);
+                assert!(!n1 && n2);
+
+                // Blocked in interval t1 - t2
+
+                statictokens.push(Token {
+                    capacity: 0,
+                    conditions: vec![Condition {
+                        amount: 0,
+                        object: ObjectSet::Object(format!("occupied_{}", seg.clone())),
+                        temporal_relationship: TemporalRelationship::Cover,
+                        value: "No".to_string(),
+                    }],
+                    const_time: TokenTime::Fact(Some(t1), Some(t2)),
+                    timeline_name: "const_blocked".to_string(),
+                    value: "Yes".to_string(),
                 });
             }
-
-            values.push(TokenType {
-                capacity: 0,
-                conditions: vec![],
-                duration: (1, None),
-                name: "pushback_finished".to_string(),
-            });
-
-            timelines.insert(tl_name, values);
         }
 
-        // AIRPLANE MOVING LOCATION
-        for airplane in airplanes.iter() {
-            let tl_name = format!("{}_moving_loc", airplane);
-            let mut values = Vec::new();
-
-            for segment in segments.iter() {
-                for direction in directions.iter() {
-                    let location_name = format!("{}_{}", segment, direction);
-                    let travel_time = 5; // TODO
-
-                    values.push(TokenType {
-                        capacity: 0,
-                        conditions: vec![],
-                        duration: (travel_time, None),
-                        name: location_name,
-                    });
-                }
-            }
-
-            values.push(TokenType {
-                capacity: 0,
-                conditions: vec![],
-                duration: (1, None),
-                name: "moving_finished".to_string(),
-            });
-
-            timelines.insert(tl_name, values);
-        }
 
         let problem = Problem {
             groups: Vec::new(),

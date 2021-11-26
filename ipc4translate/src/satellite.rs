@@ -20,10 +20,10 @@ pub fn convert_satellites() {
             ":functions" => {}
             ":durative-action" => {
                 // println!("ACTION");
-                let stmt = &stmt[1..];
-                for s in stmt.iter() {
-                    // println!(" {}",s);
-                }
+                // let stmt = &stmt[1..];
+                // for s in stmt.iter() {
+                //     // println!(" {}",s);
+                // }
             }
             _ => {
                 println!("UNKNOWN domain statement {:?}", stmt);
@@ -167,7 +167,10 @@ pub fn convert_satellites() {
                                 match expr[0].unwrap_atom().to_string().as_str() {
                                     "visible" => {
                                         let antenna = expr[1].unwrap_atom().to_string().to_lowercase();
-                                        let satellite = expr[2].unwrap_atom().to_string().to_lowercase();
+
+                                        // The satellite conditions seems to not be used in the original
+                                        // PDDL problem.
+                                        let _satellite = expr[2].unwrap_atom().to_string().to_lowercase();
 
                                         let t = (t * 100. + 0.5) as usize;
                                         // let t2 = (t2 * 100. + 0.5) as usize;
@@ -365,6 +368,8 @@ pub fn convert_satellites() {
                 value: "Off".to_string(),
                 capacity: 0,
                 const_time: TokenTime::Fact(None, None),
+                conditions: vec![],
+
             });
 
             let mut values = vec![
@@ -552,6 +557,8 @@ pub fn convert_satellites() {
                 capacity: 0,
                 const_time: TokenTime::Goal,
                 value: "Sent".to_string(),
+                conditions: vec![],
+
             });
         }
 
@@ -562,30 +569,36 @@ pub fn convert_satellites() {
                 value: "Available".to_string(),
                 capacity: 1,
                 const_time: TokenTime::Fact(None, None),
+                conditions: vec![],
+
             });
         }
 
         // POINTSTO facts
         for (sat, dir) in pointing.iter() {
             let timeline_name = format!("dir_{}", sat);
-            let value = format!("{}", dir);
+            let value = dir.clone();
             statictokens.push(Token {
                 timeline_name,
                 value,
                 capacity: 0,
                 const_time: TokenTime::Fact(None, None),
+                conditions: vec![],
+
             });
         }
 
         // POINTSTO goal
         for (sat, dir) in goal_pointing.iter() {
             let timeline_name = format!("dir_{}", sat);
-            let value = format!("{}", dir);
+            let value = dir.clone();
             statictokens.push(Token {
                 timeline_name,
                 value,
                 capacity: 0,
                 const_time: TokenTime::Goal,
+                                conditions: vec![],
+
             });
         }
 
@@ -612,6 +625,8 @@ pub fn convert_satellites() {
                     value: "Available".to_string(),
                     capacity: 1,
                     const_time: TokenTime::Fact(Some(*t1), Some(*t2)),
+                    conditions: vec![],
+
                 })
             }
         }
