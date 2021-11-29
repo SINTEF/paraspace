@@ -1072,6 +1072,11 @@ pub fn solve(problem: &Problem, minimizecores: bool) -> Result<Solution, SolverE
                                     Some(goalvalue),
                                 );
                                 println!("     expanded={}", expanded);
+
+                                if !expanded && coresize == 1 {
+                                    return Err(SolverError::NoSolution);
+                                }
+
                             } else {
                                 // Don't expand states unless we have to.
                             }
