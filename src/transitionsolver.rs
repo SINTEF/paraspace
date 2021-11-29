@@ -283,41 +283,35 @@ pub fn solve(problem: &Problem, minimizecores: bool) -> Result<Solution, SolverE
 
                             states[state_idx].can_expand = can_expand;
 
+                            let goal_lit = Bool::fresh_const(&ctx, "goal");
+                            if let Some(active) = tokens[token_idx].active.as_ref() {
+                                solver.assert(&Bool::implies(&goal_lit, active));
+                            }
+                            assert!(goal_lits
+                                .insert((timeline_name, states[state_idx].state_seq as isize), goal_lit.clone())
+                                .is_none());
+
+                            // Select at least one goal (at most one goal is implied by the disabling of tokens below)
+                            let mut clause = Vec::new();
+                            if let Some(prev_extension) = timelines[timelines_by_name[timeline_name]]
+                                .goal_state_extension
+                                .as_ref()
+                            {
+                                assert!(expand_goal_state_lits.remove(prev_extension).is_some());
+                                clause.push(Bool::not(prev_extension));
+                            }
+                            clause.push(goal_lit);
+
                             if can_expand {
-                                let goal_lit = Bool::fresh_const(&ctx, "goal");
-                                if let Some(active) = tokens[token_idx].active.as_ref() {
-                                    solver.assert(&Bool::implies(&goal_lit, active));
-                                }
-                                assert!(goal_lits
-                                    .insert((timeline_name, states[state_idx].state_seq as isize), goal_lit.clone())
-                                    .is_none());
-
-                                // Select at least one goal (at most one goal is implied by the disabling of tokens below)
-                                let mut clause = Vec::new();
-                                if let Some(prev_extension) = timelines[timelines_by_name[timeline_name]]
-                                    .goal_state_extension
-                                    .as_ref()
-                                {
-                                    assert!(expand_goal_state_lits.remove(prev_extension).is_some());
-                                    clause.push(Bool::not(prev_extension));
-                                }
-                                clause.push(goal_lit);
-
                                 let extension = Bool::fresh_const(&ctx, "addgoal");
                                 clause.push(extension.clone());
                                 expand_goal_state_lits
                                     .insert(extension.clone(), (timelines_by_name[timeline_name], &goal.value));
                                 timelines[timelines_by_name[timeline_name]].goal_state_extension = Some(extension);
-
-                                let clause_refs = clause.iter().collect::<Vec<_>>();
-                                solver.assert(&Bool::or(&ctx, &clause_refs));
-                            } else {
-                                // If we can only get to the goal one time, then
-                                // might as well just assert this state.
-                                if let Some(active) = tokens[token_idx].active.as_ref() {
-                                    solver.assert(active);
-                                }
                             }
+
+                            let clause_refs = clause.iter().collect::<Vec<_>>();
+                            solver.assert(&Bool::or(&ctx, &clause_refs));
                         }
                     }
 
@@ -880,7 +874,7 @@ pub fn solve(problem: &Problem, minimizecores: bool) -> Result<Solution, SolverE
                     // Special-case parwise exclusion, which is probably faster than
                     // the long pseudo-boolean constraint needed for capacity >=2
 
-                    println!("Cap1 exclusion {}", rc.users.len());
+                    // println!("Cap1 exclusion {}", rc.users.len());
                     for i in 0..rc.users.len() {
                         for j in (i + 1)..rc.users.len() {
                             let (link1, token1, amount1) = &rc.users[i];
@@ -1076,7 +1070,6 @@ pub fn solve(problem: &Problem, minimizecores: bool) -> Result<Solution, SolverE
                                 if !expanded && coresize == 1 {
                                     return Err(SolverError::NoSolution);
                                 }
-
                             } else {
                                 // Don't expand states unless we have to.
                             }
@@ -1100,7 +1093,7 @@ pub fn solve(problem: &Problem, minimizecores: bool) -> Result<Solution, SolverE
                                 .map(|t| tokens[*t].value)
                                 .collect::<Vec<_>>();
 
-                            if coresize <= 5  || expandstateseq_only {
+                            if coresize <= 5 || expandstateseq_only {
                                 if timelines[states[state_idx].timeline].facts_only {
                                     println!(
                                         "Cannot expand facts-only timleine  {} state{} values{:?}",
@@ -1108,9 +1101,9 @@ pub fn solve(problem: &Problem, minimizecores: bool) -> Result<Solution, SolverE
                                     );
                                 } else {
                                     println!(
-                                "need to expand state because of MetBy condition cross-timeline {} state{} values{:?}",
-                                timeline_name, state_idx, values
-                            );
+                                        "need to expand state because of MetBy condition cross-timeline {} state{} values{:?}",
+                                        timeline_name, state_idx, values
+                                    );
 
                                     expand_n(
                                         problem,
@@ -1253,10 +1246,10 @@ fn expand_n<'a, 'z>(
         let token_start_idx = tokens.len();
         let values = next_values_from(&problem.timelines[timeline_idx], prev_values.as_deref());
 
-        println!(
-            "adding tl:{} state:{} values{:?}",
-            problem.timelines[timeline_idx].name, state_seq, values
-        );
+        // println!(
+        //     "adding tl:{} state:{} values{:?}",
+        //     problem.timelines[timeline_idx].name, state_seq, values
+        // );
 
         let state_tokens = values
             .iter()
