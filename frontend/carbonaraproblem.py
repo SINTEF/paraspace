@@ -31,9 +31,9 @@ for plates in [1,2]:
 
             carbonara = p.timeline(classname="Carbonara", name=f"carbonara_{i}")
             carbonara.state("Cooking", dur=(3, 3), conditions=[
-                MetBy(f"spaghetti_{i}", "Cooked"),
-                MetBy(f"lardon_{i}", "Cooked"),
-                MetBy(f"eggs_{i}", "Beaten"),
+                StartsAfter(f"spaghetti_{i}", "Cooked"),
+                StartsAfter(f"lardon_{i}", "Cooked"),
+                StartsAfter(f"eggs_{i}", "Beaten"),
                 UseResource(Any("Plate"), 1)
             ])
             carbonara.state("Cooked", conditions=[TransitionFrom("Cooking")])

@@ -34,8 +34,8 @@ for (n_kilns,n_pieces) in [(1,2),(2,4),(2,6),(4,6),(5,10),(1,10)]:
     for structure_idx in range(n_pieces // 2):
         structure = p.timeline("Structure", f"structure_{structure_idx}")
         structure.state("Assembling", dur=(1,1), conditions=[
-            MetBy(f"piece_{2*structure_idx}", "Treated"),
-            MetBy(f"piece_{2*structure_idx +1}", "Treated")
+            During(f"piece_{2*structure_idx}", "Treated"),
+            During(f"piece_{2*structure_idx +1}", "Treated")
         ])
         structure.state("Assembled", conditions=[TransitionFrom("Assembling")])
         structure.state("Baking", dur=(3,3), conditions=[

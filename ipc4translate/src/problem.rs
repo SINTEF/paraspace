@@ -71,6 +71,7 @@ pub enum TemporalRelationship {
     MetByTransitionFrom,
     Meets,
     Cover,
+    Equal,
 }
 
 
@@ -78,6 +79,7 @@ pub enum TemporalRelationship {
 pub enum ObjectSet {
     Group(String),
     Object(String),
+    Set(Vec<String>),
 }
 
 //

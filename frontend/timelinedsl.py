@@ -67,6 +67,12 @@ class Meets:
     amount :int = 0
 
 @dataclass
+class StartsAfter:
+    timelineref: Any
+    value :Any
+    amount :int = 0
+
+@dataclass
 class During:
     timelineref :Any
     value :Any
@@ -111,6 +117,8 @@ def condition_to_dict(obj_name, condition):
         return { "temporal_relationship": "MetBy", "object": objectref_to_dict(obj_name), "value": condition.value, "amount": 0}
     elif isinstance(condition, TransitionTo):
         return { "temporal_relationship": "Meets", "object": objectref_to_dict(obj_name), "value": condition.value, "amount": 0}
+    elif isinstance(condition, StartsAfter):
+        return { "temporal_relationship": "StartsAfter", "object": objectref_to_dict(condition.timelineref), "value": condition.value, "amount": 0}
     elif isinstance(condition, MetBy):
         return { "temporal_relationship": "MetBy", "object":  objectref_to_dict(condition.timelineref), "value": condition.value, "amount": condition.amount }
     elif isinstance(condition, Meets):

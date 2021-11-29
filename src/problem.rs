@@ -70,11 +70,14 @@ pub enum TemporalRelationship {
     MetByTransitionFrom,
     Meets,
     Cover,
+    Equal,
+    StartsAfter,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub enum ObjectSet {
     Group(String),
+    Set(Vec<String>),
     Object(String),
 }
 

@@ -18,6 +18,7 @@ struct State<'z> {
     state_seq: usize,
     active: Bool<'z>,
     activate_next: Bool<'z>,
+    can_expand: bool,
 }
 
 struct Token<'a, 'z> {
@@ -38,6 +39,7 @@ struct Timeline<'z> {
     states: Vec<usize>,
     goal_state_extension: Option<Bool<'z>>,
     facts_only: bool,
+    fixed_end_time: bool,
 }
 
 pub fn solve(problem: &Problem, minimizecores: bool) -> Result<Solution, SolverError> {
@@ -54,6 +56,8 @@ pub fn solve(problem: &Problem, minimizecores: bool) -> Result<Solution, SolverE
     // println!("Z3 params:\n{}", params.to_string());
     solver.set_params(&params);
 
+    let end_of_time = Real::fresh_const(&ctx, "endoftime");
+
     let groups_by_name = problem
         .groups
         .iter()
@@ -67,6 +71,7 @@ pub fn solve(problem: &Problem, minimizecores: bool) -> Result<Solution, SolverE
             states: Vec::new(),
             goal_state_extension: None,
             facts_only: false,
+            fixed_end_time: false,
         })
         .collect::<Vec<_>>();
 
@@ -84,7 +89,7 @@ pub fn solve(problem: &Problem, minimizecores: bool) -> Result<Solution, SolverE
     let mut expand_links_queue: Vec<(bool, usize)> = Vec::new();
 
     let mut expand_links_lits: HashMap<Bool, usize> = HashMap::new();
-    let mut expand_goal_state_lits: HashMap<Bool, usize> = HashMap::new();
+    let mut expand_goal_state_lits: HashMap<Bool, (usize, &str)> = HashMap::new();
 
     let mut resource_constraints: HashMap<usize, ResourceConstraint> = Default::default(); // token to resourceconstraint
 
@@ -106,6 +111,7 @@ pub fn solve(problem: &Problem, minimizecores: bool) -> Result<Solution, SolverE
                 states: Vec::new(),
                 goal_state_extension: None,
                 facts_only: true,
+                fixed_end_time: false,
             });
 
             assert!(timeline_names.len() == timelines.len());
@@ -116,11 +122,13 @@ pub fn solve(problem: &Problem, minimizecores: bool) -> Result<Solution, SolverE
     // The facts need to be the first states.
     for const_token in problem.tokens.iter() {
         if let crate::problem::TokenTime::Fact(start_time, end_time) = const_token.const_time {
-            if !timelines[timelines_by_name[const_token.timeline_name.as_str()]]
-                .states
-                .is_empty()
-            {
+            let timeline = &mut timelines[timelines_by_name[const_token.timeline_name.as_str()]];
+            if !timeline.states.is_empty() {
                 // todo!("Multiple facts.");
+            }
+
+            if end_time.is_some() {
+                timeline.fixed_end_time = true;
             }
 
             let token_idx = tokens.len();
@@ -146,6 +154,7 @@ pub fn solve(problem: &Problem, minimizecores: bool) -> Result<Solution, SolverE
                 timeline: timelines_by_name[const_token.timeline_name.as_str()],
                 active: Bool::from_bool(&ctx, true),
                 activate_next: Bool::fresh_const(&ctx, "nxstate"),
+                can_expand: false,
             });
             timelines[timelines_by_name[const_token.timeline_name.as_str()]]
                 .states
@@ -234,15 +243,26 @@ pub fn solve(problem: &Problem, minimizecores: bool) -> Result<Solution, SolverE
                 //     state_idx, states[state_idx].timeline, facts_only
                 // );
 
+                let state = &states[state_idx];
+                if !timelines[state.timeline].facts_only {
+                    // If this is the last state, it has to last until the end of time.
+                    solver.assert(&Bool::implies(
+                        &state.activate_next.not(),
+                        &Real::ge(&state.end_time, &end_of_time),
+                    ));
+                }
+                solver.assert(&Real::le(&state.end_time, &end_of_time));
+
                 // There are no goals for facts only timelines.
                 if !facts_only {
                     let timeline_idx = states[state_idx].timeline;
                     let timeline_name = timeline_names[timeline_idx];
+
                     if let Some(goal) = problem.tokens.iter().find(|const_token| {
                         const_token.timeline_name == timeline_name && matches!(const_token.const_time, TokenTime::Goal)
                     }) {
                         // Is this a potential final/goal state?
-                        if let Some(token_idx) = states[state_idx]
+                        if let Some(&token_idx) = states[state_idx]
                             .tokens
                             .iter()
                             .find(|t| tokens[**t].value == goal.value)
@@ -261,9 +281,11 @@ pub fn solve(problem: &Problem, minimizecores: bool) -> Result<Solution, SolverE
                                     )
                             };
 
+                            states[state_idx].can_expand = can_expand;
+
                             if can_expand {
                                 let goal_lit = Bool::fresh_const(&ctx, "goal");
-                                if let Some(active) = tokens[*token_idx].active.as_ref() {
+                                if let Some(active) = tokens[token_idx].active.as_ref() {
                                     solver.assert(&Bool::implies(&goal_lit, active));
                                 }
                                 assert!(goal_lits
@@ -283,7 +305,8 @@ pub fn solve(problem: &Problem, minimizecores: bool) -> Result<Solution, SolverE
 
                                 let extension = Bool::fresh_const(&ctx, "addgoal");
                                 clause.push(extension.clone());
-                                expand_goal_state_lits.insert(extension.clone(), timelines_by_name[timeline_name]);
+                                expand_goal_state_lits
+                                    .insert(extension.clone(), (timelines_by_name[timeline_name], &goal.value));
                                 timelines[timelines_by_name[timeline_name]].goal_state_extension = Some(extension);
 
                                 let clause_refs = clause.iter().collect::<Vec<_>>();
@@ -291,7 +314,7 @@ pub fn solve(problem: &Problem, minimizecores: bool) -> Result<Solution, SolverE
                             } else {
                                 // If we can only get to the goal one time, then
                                 // might as well just assert this state.
-                                if let Some(active) = tokens[*token_idx].active.as_ref() {
+                                if let Some(active) = tokens[token_idx].active.as_ref() {
                                     solver.assert(active);
                                 }
                             }
@@ -528,6 +551,7 @@ pub fn solve(problem: &Problem, minimizecores: bool) -> Result<Solution, SolverE
                         .iter()
                         .flat_map(|c| c.iter().map(String::as_str))
                         .collect::<Vec<_>>(),
+                    ObjectSet::Set(c) => c.iter().map(String::as_str).collect(),
                     ObjectSet::Object(n) => {
                         vec![n.as_str()]
                     }
@@ -693,12 +717,26 @@ pub fn solve(problem: &Problem, minimizecores: bool) -> Result<Solution, SolverE
                                 &states[tokens[token_idx].state].end_time,
                                 &states[tokens[conds[cond_idx].token_idx].state].start_time,
                             )],
+                            TemporalRelationship::StartsAfter => vec![Real::le(
+                                &states[tokens[token_idx].state].start_time,
+                                &states[tokens[conds[cond_idx].token_idx].state].start_time,
+                            )],
                             TemporalRelationship::Cover => vec![
                                 Real::le(
                                     &states[tokens[token_idx].state].start_time,
                                     &states[tokens[conds[cond_idx].token_idx].state].start_time,
                                 ),
                                 Real::le(
+                                    &states[tokens[conds[cond_idx].token_idx].state].end_time,
+                                    &states[tokens[token_idx].state].end_time,
+                                ),
+                            ],
+                            TemporalRelationship::Equal => vec![
+                                Real::_eq(
+                                    &states[tokens[token_idx].state].start_time,
+                                    &states[tokens[conds[cond_idx].token_idx].state].start_time,
+                                ),
+                                Real::_eq(
                                     &states[tokens[conds[cond_idx].token_idx].state].end_time,
                                     &states[tokens[token_idx].state].end_time,
                                 ),
@@ -938,6 +976,7 @@ pub fn solve(problem: &Problem, minimizecores: bool) -> Result<Solution, SolverE
         let expand_state_seq_lits: HashMap<Bool, usize> = timelines
             .iter()
             .map(|tl| *tl.states.last().unwrap())
+            .filter(|s_idx| states[*s_idx].can_expand)
             .map(|s_idx| (states[s_idx].activate_next.clone(), s_idx))
             .collect();
 
@@ -982,26 +1021,60 @@ pub fn solve(problem: &Problem, minimizecores: bool) -> Result<Solution, SolverE
                 let use_trim_core = minimizecores;
                 let use_minimize_core = minimizecores;
 
-                if use_trim_core {
-                    crate::cores::trim_core(&mut core, &solver, |_| {});
-                }
+                if minimizecores {
+                    println!("Minmizing core...");
+                    if use_trim_core {
+                        crate::cores::trim_core(&mut core, &solver, |_| {});
+                    }
 
-                if use_minimize_core {
-                    crate::cores::minimize_core(&mut core, &solver, |_| {});
+                    if use_minimize_core {
+                        crate::cores::minimize_core(&mut core, &solver, |_| {});
+                    }
                 }
 
                 // core_sizes.push(core.len());
-                println!("CORE SIZE #{}", core.len());
+
+                let expandstate_only = core.iter().all(|c| {
+                    if let Some(nc) = neg_expansions.get(c) {
+                        if expand_goal_state_lits.get(nc).is_some() {
+                            return true;
+                        }
+                    }
+                    false
+                });
+
+                let expandstateseq_only = core.iter().all(|c| {
+                    if let Some(nc) = neg_expansions.get(c) {
+                        if expand_state_seq_lits.get(nc).is_some() {
+                            return true;
+                        }
+                    }
+                    false
+                });
+
+                let coresize = core.len();
+                println!("CORE SIZE #{}", coresize);
                 for c in core {
                     if let Some(nc) = neg_expansions.get(&c) {
-                        if let Some(timeline) = expand_goal_state_lits.get(nc) {
-                            println!("Expand goals in timleine {}", timeline_names[*timeline]);
-                            println!(
-                                "  -expand GOALs for {}",
-                                // problem.timelines[states[token.state].timeline].name, token.value, cond.cond_spec
-                                timeline_names[*timeline]
-                            );
-                            // todo!()
+                        if let Some((timeline, goalvalue)) = expand_goal_state_lits.get(nc) {
+                            if coresize <= 5 || expandstate_only {
+                                println!("Expand goals in timleine {}", timeline_names[*timeline]);
+                                println!("  -expand goal value {} for {}", goalvalue, timeline_names[*timeline]);
+
+                                let expanded = expand_until(
+                                    problem,
+                                    &ctx,
+                                    &solver,
+                                    *timeline,
+                                    &mut timelines,
+                                    &mut states,
+                                    &mut tokens,
+                                    Some(goalvalue),
+                                );
+                                println!("     expanded={}", expanded);
+                            } else {
+                                // Don't expand states unless we have to.
+                            }
                         } else if let Some(cond_idx) = expand_links_lits.get(nc).copied() {
                             let cond = &conds[cond_idx];
                             let token = &tokens[cond.token_idx];
@@ -1015,27 +1088,37 @@ pub fn solve(problem: &Problem, minimizecores: bool) -> Result<Solution, SolverE
                             expand_links_queue.push((true, cond_idx));
                             // need_more_links_than = links.len();
                         } else if let Some(state_idx) = expand_state_seq_lits.get(nc).copied() {
-                            let timeline = timeline_names[states[state_idx].timeline];
+                            let timeline_name = timeline_names[states[state_idx].timeline];
                             let values = states[state_idx]
                                 .tokens
                                 .iter()
                                 .map(|t| tokens[*t].value)
                                 .collect::<Vec<_>>();
-                            println!(
+
+                            if coresize <= 5  || expandstateseq_only {
+                                if timelines[states[state_idx].timeline].facts_only {
+                                    println!(
+                                        "Cannot expand facts-only timleine  {} state{} values{:?}",
+                                        timeline_name, state_idx, values
+                                    );
+                                } else {
+                                    println!(
                                 "need to expand state because of MetBy condition cross-timeline {} state{} values{:?}",
-                                timeline, state_idx, values
+                                timeline_name, state_idx, values
                             );
 
-                            expand_n(
-                                problem,
-                                &ctx,
-                                &solver,
-                                states[state_idx].timeline,
-                                &mut timelines,
-                                &mut states,
-                                &mut tokens,
-                                1,
-                            );
+                                    expand_n(
+                                        problem,
+                                        &ctx,
+                                        &solver,
+                                        states[state_idx].timeline,
+                                        &mut timelines,
+                                        &mut states,
+                                        &mut tokens,
+                                        1,
+                                    );
+                                }
+                            }
                         } else {
                             panic!("didn't find positive core lit");
                         }
@@ -1165,7 +1248,10 @@ fn expand_n<'a, 'z>(
         let token_start_idx = tokens.len();
         let values = next_values_from(&problem.timelines[timeline_idx], prev_values.as_deref());
 
-        // println!("adding tl:{} state:{} values{:?}", problem.timelines[timeline_idx].name, state_seq,values );
+        println!(
+            "adding tl:{} state:{} values{:?}",
+            problem.timelines[timeline_idx].name, state_seq, values
+        );
 
         let state_tokens = values
             .iter()
@@ -1252,6 +1338,7 @@ fn expand_n<'a, 'z>(
             timeline: timeline_idx,
             active: state_active,
             activate_next: Bool::fresh_const(ctx, "nxstate"),
+            can_expand: true,
         });
         timelines[timeline_idx].states.push(state_idx);
     }

@@ -5,7 +5,7 @@ use z3::ast::{Bool, Real};
 use crate::{multiplicity::multiplicity_one, problem::*};
 use std::collections::HashMap;
 
-pub fn solve(problem: &Problem, _minimizecores :bool) -> Result<Solution, SolverError> {
+pub fn solve(problem: &Problem, _minimizecores: bool) -> Result<Solution, SolverError> {
     println!("Starting pure-token-based solver.");
     let z3_config = z3::Config::new();
     let ctx = z3::Context::new(&z3_config);
@@ -234,6 +234,7 @@ pub fn solve(problem: &Problem, _minimizecores :bool) -> Result<Solution, Solver
                         .iter()
                         .flat_map(|c| c.iter().map(String::as_str))
                         .collect::<Vec<_>>(),
+                    ObjectSet::Set(c) => c.iter().map(String::as_str).collect(),
                     ObjectSet::Object(n) => {
                         vec![n.as_str()]
                     }
@@ -340,7 +341,7 @@ pub fn solve(problem: &Problem, _minimizecores :bool) -> Result<Solution, Solver
                                 tokens[token_idx].end_time.as_ref().unwrap(),
                                 token.start_time.as_ref().unwrap(),
                             )], // TODO this does not take into account that the target token's timeline must transition to some other value.
-
+                            
                             TemporalRelationship::MetBy => vec![Real::_eq(
                                 tokens[token_idx].end_time.as_ref().unwrap(),
                                 token.start_time.as_ref().unwrap(),
@@ -356,6 +357,8 @@ pub fn solve(problem: &Problem, _minimizecores :bool) -> Result<Solution, Solver
                                 ),
                             ],
                             TemporalRelationship::Meets => todo!(),
+                            TemporalRelationship::Equal => todo!(),
+                            TemporalRelationship::StartsAfter => todo!(),
                         };
 
                         if link.linkspec.amount > 0 {
