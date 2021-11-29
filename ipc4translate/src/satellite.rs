@@ -348,18 +348,43 @@ pub fn convert_satellites() {
                 temporal_relationship: TemporalRelationship::Cover,
             };
 
+            statictokens.push(Token {
+                capacity: 0,
+                conditions: vec![],
+                const_time: TokenTime::Fact(None,None),
+                timeline_name: format!("power_instrument_{}", instrument),
+                value: "NotAvailable".to_string()
+            });
+
             timelines.insert(
                 format!("power_instrument_{}", instrument),
                 vec![TokenType {
                     capacity: 0,
                     conditions: vec![Condition {
-                        amount: 0,
+                        amount: 1,
                         object: ObjectSet::Object(format!("power_{}", instrument_belongs_to[instrument])),
                         value: "Available".to_string(),
                         temporal_relationship: TemporalRelationship::Cover,
+                    },
+                    Condition {
+                        amount: 0,
+                        object: ObjectSet::Object(format!("power_instrument_{}", instrument)),
+                        value: "NotAvailable".to_string(),
+                        temporal_relationship: TemporalRelationship::MetByTransitionFrom,
                     }],
                     duration: (1, None),
                     name: "Available".to_string(),
+                },
+                TokenType {
+                    capacity: 0,
+                    conditions: vec![Condition {
+                        amount: 0,
+                        object: ObjectSet::Object(format!("power_instrument_{}", instrument)),
+                        value: "Available".to_string(),
+                        temporal_relationship: TemporalRelationship::MetByTransitionFrom,
+                    }],
+                    duration: (1, None),
+                    name: "NotAvailable".to_string(),
                 }],
             );
 
@@ -523,7 +548,7 @@ pub fn convert_satellites() {
                     duration: (dur, Some(dur)),
                     conditions: vec![
                         Condition {
-                            temporal_relationship: TemporalRelationship::MetBy,
+                            temporal_relationship: TemporalRelationship::MetByTransitionFrom,
                             object: ObjectSet::Object(timeline_name.clone()),
                             amount: 0,
                             value: "HaveImage".to_string(),
@@ -541,7 +566,7 @@ pub fn convert_satellites() {
                     name: "Sent".to_string(),
                     duration: (1, None),
                     conditions: vec![Condition {
-                        temporal_relationship: TemporalRelationship::MetBy,
+                        temporal_relationship: TemporalRelationship::MetByTransitionFrom,
                         object: ObjectSet::Object(timeline_name.clone()),
                         amount: 0,
                         value: "Send".to_string(),

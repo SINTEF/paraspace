@@ -484,7 +484,9 @@ pub fn convert_airport() {
 
                 let occupations = node_conditions.entry(name.clone()).or_default();
 
+                if mode != airborne_mode {
                 occupations.insert(format!("occupied_{}", seg), true);
+            }
 
                 // Block other resources
                 if mode != park_mode && mode != airborne_mode {

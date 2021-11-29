@@ -7,6 +7,7 @@ fn main() {
     airport::convert_airport();
     satellite::convert_satellites();
     pipesworld::convert_pipesworld_notankage_temporal_deadlines();
+    pipesworld::convert_pipesworld_batchencoding_notankage_temporal_deadlines();
 }
 
 trait SexpUnwrap {
