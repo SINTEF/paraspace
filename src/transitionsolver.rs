@@ -217,6 +217,8 @@ pub fn solve(problem: &Problem, minimizecores: bool) -> Result<Solution, SolverE
     #[allow(unused)]
     let mut n_smt_calls = 0;
 
+    let mut n_exclusions = 0;
+    let mut n_pbs = 0;
     // println!("TL names {:?}", timelines_by_name);
 
     drop(p1);
@@ -829,8 +831,6 @@ pub fn solve(problem: &Problem, minimizecores: bool) -> Result<Solution, SolverE
             }
         }
 
-        let mut n_exclusions = 0;
-        let mut n_pbs = 0;
         let p = hprof::enter("expand_resources");
         for (_token_idx, rc) in resource_constraints.iter_mut() {
             if rc.users.len() > rc.integrated {
@@ -839,8 +839,6 @@ pub fn solve(problem: &Problem, minimizecores: bool) -> Result<Solution, SolverE
                 if rc.integrated != 0 {
                     // println!("WARNING: resource constraint users has been extended.");
                 }
-
-                rc.integrated = rc.users.len();
 
                 if !rc.closed {
                     // TODO: make an extension point in the pseudo-boolean constraint for adding more usages later.
@@ -876,7 +874,8 @@ pub fn solve(problem: &Problem, minimizecores: bool) -> Result<Solution, SolverE
 
                     // println!("Cap1 exclusion {}", rc.users.len());
                     for i in 0..rc.users.len() {
-                        for j in (i + 1)..rc.users.len() {
+                        let start_from = (i + 1).max(rc.integrated);
+                        for j in start_from..rc.users.len() {
                             let (link1, token1, amount1) = &rc.users[i];
                             let (link2, token2, amount2) = &rc.users[j];
 
@@ -954,6 +953,8 @@ pub fn solve(problem: &Problem, minimizecores: bool) -> Result<Solution, SolverE
                         n_pbs += 1;
                     }
                 }
+
+                rc.integrated = rc.users.len();
             }
         }
 

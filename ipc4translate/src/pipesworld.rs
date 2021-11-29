@@ -507,7 +507,7 @@ pub fn convert_pipesworld_batchencoding_notankage_temporal_deadlines() {
                             Condition {
                                 amount: 0,
                                 object: ObjectSet::Set(compatible_batches.clone()),
-                                temporal_relationship: TemporalRelationship::Equal,
+                                temporal_relationship: TemporalRelationship::Cover,
                                 value: format!("{}->{}", prev_part, part1.clone()),
                             },
                         ],
@@ -539,8 +539,8 @@ pub fn convert_pipesworld_batchencoding_notankage_temporal_deadlines() {
                             Condition {
                                 amount: 0,
                                 object: ObjectSet::Set(compatible_batches.clone()),
-                                temporal_relationship: TemporalRelationship::Equal,
-                                value: format!("{}->{}", part1.clone(), next_part),
+                                temporal_relationship: TemporalRelationship::Cover,
+                                value: format!("{}->{}", next_part, part2.clone()),
                             },
                         ],
                         capacity: 0,
@@ -596,7 +596,7 @@ pub fn convert_pipesworld_batchencoding_notankage_temporal_deadlines() {
                                 Condition {
                                     amount: 0,
                                     object: ObjectSet::Set(compatible_batches.clone()),
-                                    temporal_relationship: TemporalRelationship::Equal,
+                                    temporal_relationship: TemporalRelationship::Cover,
                                     value: format!("{}->{}", next_part, pipe_part),
                                 },
                             ],
@@ -652,7 +652,7 @@ pub fn convert_pipesworld_batchencoding_notankage_temporal_deadlines() {
                                 Condition {
                                     amount: 0,
                                     object: ObjectSet::Set(compatible_batches.clone()),
-                                    temporal_relationship: TemporalRelationship::Equal,
+                                    temporal_relationship: TemporalRelationship::Cover,
                                     value: format!("{}->{}", next_part, pipe_part.clone()),
                                 },
                             ],
