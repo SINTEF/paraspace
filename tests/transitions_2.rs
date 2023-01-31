@@ -42,10 +42,11 @@ pub fn transitions_2() {
             value: "s3".to_string(),
             const_time: TokenTime::Goal,
             capacity: 0,
+            conditions: vec![],
         }],
     };
 
-    let solution = solve(&problem).unwrap();
+    let solution = solve(&problem, false).unwrap();
     println!("SOLUTION {:#?}", solution);
 
     assert!(solution.tokens.len() == 3);

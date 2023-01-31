@@ -6,7 +6,7 @@ pub fn carbonara5() {
 
     println!("Problem:\n{:#?}", problem);
     println!("Solving...");
-    let solution = tokensolver::solve(&problem);
+    let solution = tokensolver::solve(&problem, false);
     match solution {
         Ok(_) => {
             println!("Success!")
