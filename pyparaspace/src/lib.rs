@@ -49,7 +49,7 @@ fn sum_as_string(a: usize, b: usize) -> PyResult<String> {
 
 #[pyfunction]
 fn solve(s: String) -> String {
-    timelinemodel::solve_json(s)
+    paraspace::solve_json(s)
 }
 
 /// A Python module implemented in Rust.
