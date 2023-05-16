@@ -138,6 +138,9 @@ fn fact(a: Option<usize>, b: Option<usize>) -> TokenTimePy {
 fn pyparaspace(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(solve, m)?)?;
 
+    m.add_function(wrap_pyfunction!(goal, m)?)?;
+    m.add_function(wrap_pyfunction!(fact, m)?)?;
+
     m.add_class::<ProblemPy>()?;
     m.add_class::<TimelinePy>()?;
     m.add_class::<ValuePy>()?;
@@ -147,27 +150,4 @@ fn pyparaspace(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_class::<TokenPy>()?;
 
     Ok(())
-}
-
-
-
-
-
-
-
-pub enum Animal {
-    Cat {
-        purr: String
-    },
-    Dog {
-        woof :String
-    }
-}
-
-pub fn x(a :Animal) {
-    let sound = match a {
-        Group(s) => s,
-        Cat { purr, .. } => purr,
-        Dog { woof } => woof,
-    }
 }
