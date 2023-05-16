@@ -79,7 +79,31 @@ pub struct TokenPy {
     #[pyo3(get)]
     pub const_time: TokenTimePy,
     #[pyo3(get)]
-    pub conditions :Vec<ConditionPy>,
+    pub conditions: Vec<ConditionPy>,
+}
+
+//
+// SOLUTION
+//
+
+#[pyclass(name = "Solution")]
+#[derive(Clone)]
+pub struct SolutionPy {
+    #[pyo3(get)]
+    pub tokens: Vec<SolutionTokenPy>,
+}
+
+#[pyclass(name = "SolutionToken")]
+#[derive(Clone)]
+pub struct SolutionTokenPy {
+    #[pyo3(get)]
+    pub object_name: String,
+    #[pyo3(get)]
+    pub value: String,
+    #[pyo3(get)]
+    pub start_time: f32,
+    #[pyo3(get)]
+    pub end_time: f32,
 }
 
 #[pymethods]
@@ -102,7 +126,43 @@ impl TimelinePy {
     }
 
     fn __repr__(&self) -> String {
-        format!("Timeline(name: {}, values: {})", self.name, self.values.len())
+        format!("Timeline(name: {}, values: ({}))", self.name, self.values)
+    }
+}
+
+#[pymethods]
+impl ValuePy {
+    #[new]
+    fn init(name: String, duration: (usize, Option<usize>), conditions: Vec<ConditionPy>, capacity: u32) -> Self {
+        ValuePy {name, duration, conditions, capacity}
+    }
+
+    fn __repr__(&self) -> String {
+        format!("Value(name: {}, duration: {}, conditions: (), capacity)", self.name, self.duration, self.conditions, self.capacity)
+    }
+}
+
+#[pymethods]
+impl ConditionPy {
+    #[new]
+    fn init(temporal_relationship: TemporalRelationshipPy, object: Vec<String>, value: String, amount: u32,) -> Self {
+        ConditionPy {temporal_relationship, object, value, amount}
+    }
+
+    fn __repr__(&self) -> String {
+        format!("Condition(temporal_relationship: {}, object: {}, value: (), amount)", self.temporal_relationship, self.object, self.value, self.amount)
+    }
+}
+
+#[pymethods]
+impl TokenPy {
+    #[new]
+    fn init(timeline_name: String, value: String, capacity: u32, const_time: TokenTimePy, conditions: Vec<ConditionPy>) -> Self {
+        TokenPy {timeline_name, value, capacity, const_time, conditions}
+    }
+
+    fn __repr__(&self) -> String {
+        format!("Token(timeline_name: {}, value: {}, capacity: {}, const_time: {}, conditions: {})", self.timeline_name, self.value, self.capacity, self.const_time, self.conditions)
     }
 }
 
@@ -115,6 +175,30 @@ impl GroupPy {
 
     fn __repr__(&self) -> String {
         format!("Group({}, {} members)", &self.name, self.members.len())
+    }
+}
+
+#[pymethods]
+impl SolutionPy {
+    #[new]
+    fn init(tokens: Vec<SolutionTokenPy>) -> Self {
+        SolutionPy { tokens }
+    }
+
+    fn __repr__(&self) -> String {
+        format!("Solution(tokens: {})", self.tokens)
+    }
+}
+
+#[pymethods]
+impl SolutionTokenPy {
+    #[new]
+    fn init(object_name: String, value: String, start_time: f32, end_time: f32) -> Self {
+        SolutionTokenPy { object_name, value, start_time, end_time }
+    }
+
+    fn __repr__(&self) -> String {
+        format!("SolutionToken(object_name: {}, value: {}, start_time: {}, end_time: {})", self.object_name, self.value, self.start_time, self.end_time)
     }
 }
 
@@ -148,6 +232,8 @@ fn pyparaspace(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_class::<TemporalRelationshipPy>()?;
     m.add_class::<GroupPy>()?;
     m.add_class::<TokenPy>()?;
+    m.add_class::<SolutionPy>()?;
+    m.add_class::<SolutionTokenPy>()?;
 
     Ok(())
 }
