@@ -1,6 +1,7 @@
-use paraspace::{problem::*, transitionsolver::solve};
+use paraspace::{problem::*};
 use pyo3::prelude::*;
 
+#[derive(Clone)]
 #[pyclass(name = "Problem")]
 pub struct ProblemPy {
     #[pyo3(get)]
@@ -39,7 +40,7 @@ pub struct ConditionPy {
     #[pyo3(get)]
     pub temporal_relationship: TemporalRelationshipPy,
     #[pyo3(get)]
-    pub object: Vec<String>,
+    pub objects: Vec<String>,
     #[pyo3(get)]
     pub value: String,
     #[pyo3(get)]
@@ -48,6 +49,7 @@ pub struct ConditionPy {
 
 #[pyclass(name = "TemporalRelationship")]
 #[derive(Clone)]
+#[derive(Debug)]
 pub enum TemporalRelationshipPy {
     MetBy,
     MetByTransitionFrom,
@@ -127,7 +129,7 @@ impl TimelinePy {
     }
 
     fn __repr__(&self) -> String {
-        format!("Timeline(name: {}, values: ({}))", self.name, self.values)
+        format!("Timeline(name: {}, values: {}))", self.name, self.values.iter().map(|v| v.__repr__()).collect::<Vec<_>>().join(", "))
     }
 }
 
@@ -139,19 +141,21 @@ impl ValuePy {
     }
 
     fn __repr__(&self) -> String {
-        format!("Value(name: {}, duration: {}, conditions: (), capacity)", self.name, self.duration, self.conditions, self.capacity)
+        format!("Value(name: {}, duration: {:?}, conditions: {}, capacity: {})", 
+        self.name, self.duration, self.conditions.iter().map(|v| v.__repr__()).collect::<Vec<_>>().join(", "), self.capacity)
     }
 }
 
 #[pymethods]
 impl ConditionPy {
     #[new]
-    fn init(temporal_relationship: TemporalRelationshipPy, object: Vec<String>, value: String, amount: u32,) -> Self {
-        ConditionPy {temporal_relationship, object, value, amount}
+    fn init(temporal_relationship: TemporalRelationshipPy, objects: Vec<String>, value: String, amount: u32,) -> Self {
+        ConditionPy {temporal_relationship, objects, value, amount}
     }
 
     fn __repr__(&self) -> String {
-        format!("Condition(temporal_relationship: {}, object: {}, value: (), amount)", self.temporal_relationship, self.object, self.value, self.amount)
+        format!("Condition(temporal_relationship: {:?}, object: {}, value: {}, amount: {})", self.temporal_relationship, 
+        self.objects.join(","), self.value, self.amount)
     }
 }
 
@@ -163,7 +167,9 @@ impl TokenPy {
     }
 
     fn __repr__(&self) -> String {
-        format!("Token(timeline_name: {}, value: {}, capacity: {}, const_time: {}, conditions: {})", self.timeline_name, self.value, self.capacity, self.const_time, self.conditions)
+        format!("Token(timeline_name: {}, value: {}, capacity: {}, const_time: {:?}, conditions: {})", 
+        self.timeline_name, self.value, self.capacity, self.const_time, 
+        self.conditions.iter().map(|v| v.__repr__()).collect::<Vec<_>>().join(", "))
     }
 }
 
@@ -187,7 +193,7 @@ impl SolutionPy {
     }
 
     fn __repr__(&self) -> String {
-        format!("Solution(tokens: {})", self.tokens)
+        format!("Solution(tokens: {})", self.tokens.iter().map(|v| v.__repr__()).collect::<Vec<_>>().join(", "))
     }
 }
 
@@ -203,12 +209,20 @@ impl SolutionTokenPy {
     }
 }
 
+
 #[pyfunction]
 fn solve(problem: ProblemPy) -> PyResult<SolutionPy> {
-    let problem: Problem = problem_from_py(&problem);
-    match solve(&problem, false) {
-        Ok(s) => Ok(solution_to_py(&s)),
-        Err(e) => Err(PyTypeErr::new("Solver returned error!")),
+    let problem: Problem = problem_from_py(problem);
+    match paraspace::transitionsolver::solve(&problem, false) {
+        Ok(s) => Ok(solution_to_py(s)),
+        Err(e) => Err(pyo3::exceptions::PyException::new_err(match e
+            {
+                paraspace::SolverError::NoSolution => "No solution found",
+                paraspace::SolverError::GoalValueDurationLimit => "Goal value duration limit error",
+                paraspace::SolverError::GoalStateMissing => "Goal state missing"
+            }
+                
+        )),
     }
 }
 
@@ -245,42 +259,42 @@ fn pyparaspace(_py: Python, m: &PyModule) -> PyResult<()> {
 }
 
 // Utility for translating from pyparaspace to paraspace
-fn problem_from_py(problem: &ProblemPy) -> Problem {
+fn problem_from_py(problem: ProblemPy) -> Problem {
     let mut timelines: Vec<Timeline> = Vec::new();
-    for p in problem.timelines.iter() {
+    for p in problem.timelines.into_iter() {
         timelines.push(timeline_from_py(p));
     }
 
     let mut groups: Vec<Group> = Vec::new();
-    for g in problem.groups.iter() {
+    for g in problem.groups.into_iter() {
         groups.push(group_from_py(g));
     }
 
     let mut tokens: Vec<Token> = Vec::new();
-    for t in problem.tokens.iter() {
+    for t in problem.tokens.into_iter() {
         tokens.push(token_from_py(t));
     }
 
     Problem {timelines, groups, tokens}
 }
 
-fn timeline_from_py(timeline: &TimelinePy) -> Timeline {
+fn timeline_from_py(timeline: TimelinePy) -> Timeline {
     let mut values: Vec<Value> = Vec::new();
-    for v in timeline.values.iter() {
-        values.push(value_from_py(&v));
+    for v in timeline.values.into_iter() {
+        values.push(value_from_py(v));
     }
     Timeline {name: timeline.name, values}
 }
 
-fn value_from_py(value: &ValuePy) -> Value {
+fn value_from_py(value: ValuePy) -> Value {
     let mut conditions: Vec<Condition> = Vec::new();
-    for c in value.conditions.iter() {
-        conditions.push(condition_from_py(&c));
+    for c in value.conditions.into_iter() {
+        conditions.push(condition_from_py(c));
     }
     Value {name: value.name, duration: value.duration, conditions, capacity: value.capacity}
 }
 
-fn condition_from_py(ConditionPy { temporal_relationship, object, amount, value }: &ConditionPy) -> Condition {
+fn condition_from_py(ConditionPy { temporal_relationship, objects, amount, value }: ConditionPy) -> Condition {
     let temporal_relationship = match temporal_relationship {
         TemporalRelationshipPy::MetBy => TemporalRelationship::MetBy,
         TemporalRelationshipPy::MetByTransitionFrom => TemporalRelationship::MetByTransitionFrom,
@@ -289,32 +303,32 @@ fn condition_from_py(ConditionPy { temporal_relationship, object, amount, value 
         TemporalRelationshipPy::Equal => TemporalRelationship::Equal,
         TemporalRelationshipPy::StartsAfter => TemporalRelationship::StartsAfter,
     };
-    Condition { temporal_relationship, object, amount, value }
+    Condition { temporal_relationship, object: ObjectSet::Set(objects), amount, value }
 }
 
-fn group_from_py(GroupPy {name, members}: &GroupPy) -> Group {
+fn group_from_py(GroupPy {name, members}: GroupPy) -> Group {
     Group {name, members}
 }
 
-fn token_from_py(token: &TokenPy) -> Token {
+fn token_from_py(token: TokenPy) -> Token {
 
     let const_time = match token.const_time {
-        Some(v) => TokenTime::Fact((v.0), (v.1)),
+        Some(v) => TokenTime::Fact(v.0, v.1),
         None => TokenTime::Goal,
     };
 
     let mut conditions: Vec<Condition> = Vec::new();
-    for c in value.conditions.iter() {
-        conditions.push(condition_from_py(&c));
+    for c in token.conditions.into_iter() {
+        conditions.push(condition_from_py(c));
     }
 
     Token {timeline_name: token.timeline_name, value: token.value, capacity: token.capacity, const_time, conditions}
 }
 
-fn solution_to_py(solution: &Solution) -> SolutionPy {
+fn solution_to_py(solution: Solution) -> SolutionPy {
     let mut tokens: Vec<SolutionTokenPy> = Vec::new();
-    for t in solution.tokens.iter() {
-        tokens.push(solutiontoken_to_py(&t));
+    for t in solution.tokens.into_iter() {
+        tokens.push(solutiontoken_to_py(t));
     }
     SolutionPy {tokens}
 }
