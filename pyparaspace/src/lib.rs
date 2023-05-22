@@ -1,3 +1,4 @@
+use paraspace::{problem::*, transitionsolver::solve};
 use pyo3::prelude::*;
 
 #[pyclass(name = "Problem")]
@@ -203,8 +204,12 @@ impl SolutionTokenPy {
 }
 
 #[pyfunction]
-fn solve(s: String) -> String {
-    paraspace::solve_json(s)
+fn solve(problem: ProblemPy) -> PyResult<SolutionPy> {
+    let problem: Problem = problem_from_py(&problem);
+    match solve(&problem, false) {
+        Ok(s) => Ok(solution_to_py(&s)),
+        Err(e) => Err(PyTypeErr::new("Solver returned error!")),
+    }
 }
 
 #[pyfunction]
@@ -217,11 +222,12 @@ fn fact(a: Option<usize>, b: Option<usize>) -> TokenTimePy {
     Some((a,b))
 }
 
+
+
 /// A Python module implemented in Rust.
 #[pymodule]
 fn pyparaspace(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(solve, m)?)?;
-
     m.add_function(wrap_pyfunction!(goal, m)?)?;
     m.add_function(wrap_pyfunction!(fact, m)?)?;
 
@@ -236,4 +242,83 @@ fn pyparaspace(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_class::<SolutionTokenPy>()?;
 
     Ok(())
+}
+
+// Utility for translating from pyparaspace to paraspace
+fn problem_from_py(problem: &ProblemPy) -> Problem {
+    let mut timelines: Vec<Timeline> = Vec::new();
+    for p in problem.timelines.iter() {
+        timelines.push(timeline_from_py(p));
+    }
+
+    let mut groups: Vec<Group> = Vec::new();
+    for g in problem.groups.iter() {
+        groups.push(group_from_py(g));
+    }
+
+    let mut tokens: Vec<Token> = Vec::new();
+    for t in problem.tokens.iter() {
+        tokens.push(token_from_py(t));
+    }
+
+    Problem {timelines, groups, tokens}
+}
+
+fn timeline_from_py(timeline: &TimelinePy) -> Timeline {
+    let mut values: Vec<Value> = Vec::new();
+    for v in timeline.values.iter() {
+        values.push(value_from_py(&v));
+    }
+    Timeline {name: timeline.name, values}
+}
+
+fn value_from_py(value: &ValuePy) -> Value {
+    let mut conditions: Vec<Condition> = Vec::new();
+    for c in value.conditions.iter() {
+        conditions.push(condition_from_py(&c));
+    }
+    Value {name: value.name, duration: value.duration, conditions, capacity: value.capacity}
+}
+
+fn condition_from_py(ConditionPy { temporal_relationship, object, amount, value }: &ConditionPy) -> Condition {
+    let temporal_relationship = match temporal_relationship {
+        TemporalRelationshipPy::MetBy => TemporalRelationship::MetBy,
+        TemporalRelationshipPy::MetByTransitionFrom => TemporalRelationship::MetByTransitionFrom,
+        TemporalRelationshipPy::Meets => TemporalRelationship::Meets,
+        TemporalRelationshipPy::Cover => TemporalRelationship::Cover,
+        TemporalRelationshipPy::Equal => TemporalRelationship::Equal,
+        TemporalRelationshipPy::StartsAfter => TemporalRelationship::StartsAfter,
+    };
+    Condition { temporal_relationship, object, amount, value }
+}
+
+fn group_from_py(GroupPy {name, members}: &GroupPy) -> Group {
+    Group {name, members}
+}
+
+fn token_from_py(token: &TokenPy) -> Token {
+
+    let const_time = match token.const_time {
+        Some(v) => TokenTime::Fact((v.0), (v.1)),
+        None => TokenTime::Goal,
+    };
+
+    let mut conditions: Vec<Condition> = Vec::new();
+    for c in value.conditions.iter() {
+        conditions.push(condition_from_py(&c));
+    }
+
+    Token {timeline_name: token.timeline_name, value: token.value, capacity: token.capacity, const_time, conditions}
+}
+
+fn solution_to_py(solution: &Solution) -> SolutionPy {
+    let mut tokens: Vec<SolutionTokenPy> = Vec::new();
+    for t in solution.tokens.iter() {
+        tokens.push(solutiontoken_to_py(&t));
+    }
+    SolutionPy {tokens}
+}
+
+fn solutiontoken_to_py(SolutionToken {object_name, value, start_time, end_time}: SolutionToken) -> SolutionTokenPy {
+    SolutionTokenPy {object_name, value, start_time, end_time}
 }
