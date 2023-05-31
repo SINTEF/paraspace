@@ -1,3 +1,5 @@
+`pyparaspace`: a Python wrapper for the [ParaSpace timelines planner](https://github.com/luteberget/paraspace) -- a simple, flexible and extensible solver for timeline-based planning problems using the [Z3 Theorem Prover](https://github.com/Z3Prover/z3).
+
 # Installing
 
 Install using Pip. 
