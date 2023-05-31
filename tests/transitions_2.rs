@@ -1,4 +1,4 @@
-use timelinemodel::{problem::*, tokensolver::solve};
+use paraspace::{problem::*, tokensolver::solve};
 
 #[test]
 pub fn transitions_2() {

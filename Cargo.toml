@@ -1,5 +1,5 @@
 [package]
-name = "timelinemodel"
+name = "paraspace"
 version = "0.1.0"
 edition = "2018"
 
@@ -8,6 +8,6 @@ edition = "2018"
 [dependencies]
 serde = { version = "1.0", features = ["derive"]}
 serde_json = { version = "1.0" }
-z3 = "0.11.2"
+z3 = { version = "0.11.2", features = ["static-link-z3"]}
 structopt = { version = "0.3", default-features = false }
 hprof = "0.1"

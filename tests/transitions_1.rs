@@ -1,4 +1,4 @@
-use timelinemodel::{problem::*, tokensolver::solve};
+use paraspace::{problem::*, tokensolver::solve};
 
 #[test]
 pub fn transitions_1() {
@@ -34,6 +34,8 @@ pub fn transitions_1() {
             conditions: vec![],
         }],
     };
+
+    println!("{}", serde_json::to_string(&problem).unwrap());
 
     let solution = solve(&problem, false).unwrap();
     println!("SOLUTION {:#?}", solution);

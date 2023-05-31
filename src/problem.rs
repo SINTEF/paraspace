@@ -19,7 +19,7 @@ pub struct Token {
     pub value: String,
     pub capacity: u32,
     pub const_time: TokenTime,
-    pub conditions :Vec<Condition>,
+    pub conditions: Vec<Condition>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -53,13 +53,16 @@ pub struct Condition {
 impl Condition {
     pub fn is_timeline_transition_from(&self, timeline: &str) -> Option<&str> {
         ((matches!(self.temporal_relationship, TemporalRelationship::MetBy)
-            || matches!(self.temporal_relationship, TemporalRelationship::MetByTransitionFrom))
-            && self.object == ObjectSet::Object(timeline.to_string()))
+            || matches!(
+                self.temporal_relationship,
+                TemporalRelationship::MetByTransitionFrom
+            ))
+            && self.object.is_singleton_of(timeline))
         .then(|| self.value.as_str())
     }
     pub fn is_timeline_transition_to(&self, timeline: &str) -> Option<&str> {
         (matches!(self.temporal_relationship, TemporalRelationship::Meets)
-            && self.object == ObjectSet::Object(timeline.to_string()))
+            && self.object.is_singleton_of(timeline))
         .then(|| self.value.as_str())
     }
 }
@@ -79,6 +82,16 @@ pub enum ObjectSet {
     Group(String),
     Set(Vec<String>),
     Object(String),
+}
+
+impl ObjectSet {
+    pub fn is_singleton_of(&self, name: &str) -> bool {
+        match self {
+            ObjectSet::Group(_g) => false,
+            ObjectSet::Set(x) => x.len() == 1 && x[0] == name,
+            ObjectSet::Object(o) => o == name,
+        }
+    }
 }
 
 //

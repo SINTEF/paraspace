@@ -5,6 +5,12 @@ pub mod transitionsolver;
 pub mod cores;
 // mod cores;
 
+pub fn solve_json(input :String) -> String {
+    let problem = serde_json::de::from_str::<problem::Problem>(&input).unwrap();
+    println!("{:#?}", problem);
+    "".to_string()
+}
+
 pub fn print_calc_time<T>(name: &str, f: impl FnOnce() -> T) -> T{
     use std::time::Instant;
     let now = Instant::now();

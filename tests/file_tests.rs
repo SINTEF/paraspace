@@ -1,4 +1,4 @@
-use timelinemodel::{problem, tokensolver};
+use paraspace::{problem, tokensolver};
 
 // #[test]
 pub fn carbonara5() {

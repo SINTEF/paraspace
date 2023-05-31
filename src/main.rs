@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 use structopt::StructOpt;
-use timelinemodel::{print_calc_time, problem, tokensolver, transitionsolver};
+use paraspace::{print_calc_time, problem, tokensolver, transitionsolver};
 
 #[derive(Debug, StructOpt)]
 #[structopt(name = "timelinemodel", about = "Timelines SMT-based solver.")]
