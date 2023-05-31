@@ -36,7 +36,8 @@ This section is intended for package maintainers. The `pyparaspace`  package is
 released on PyPi with Python wheel packages that make it convenient to use
 `paraspace` without needing to set up Rust and C++ compilers and tools.
 Through the `z3-sys` package's static link option, we get the whole planner,
-including the Z3 solver, copmiled
+including the Z3 solver, statically linked. This greatly increases the
+convenience for users of the library.
 
 Windows and Manylinux platforms are currently supported.
 
