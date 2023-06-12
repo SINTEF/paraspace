@@ -10,4 +10,4 @@ crate-type = ["cdylib"]
 
 [dependencies]
 pyo3 = "0.18.1"
-paraspace = { path = "deps/paraspace" }
+paraspace = { path = "deps/paraspace", features = ["static-link-z3"] }
