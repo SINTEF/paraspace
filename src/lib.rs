@@ -1,9 +1,6 @@
 pub mod problem;
-pub mod tokensolver;
-mod multiplicity;
 pub mod transitionsolver;
 pub mod cores;
-// mod cores;
 
 pub fn solve_json(input :String) -> String {
     let problem = serde_json::de::from_str::<problem::Problem>(&input).unwrap();

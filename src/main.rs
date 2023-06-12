@@ -1,6 +1,6 @@
+use paraspace::{print_calc_time, problem, transitionsolver};
 use std::path::PathBuf;
 use structopt::StructOpt;
-use paraspace::{print_calc_time, problem, tokensolver, transitionsolver};
 
 #[derive(Debug, StructOpt)]
 #[structopt(name = "timelinemodel", about = "Timelines SMT-based solver.")]
@@ -16,12 +16,8 @@ struct Opt {
     #[structopt(long = "benchmark")]
     perftest: bool,
 
-    /// Use pure token-based representation.
-    #[structopt(long = "tokensolver")]
-    tokensolver: bool,
-
     #[structopt(long = "minimizecores")]
-    minimizecores :bool,
+    minimizecores: bool,
 }
 
 fn main() {
@@ -32,11 +28,7 @@ fn main() {
         perftest();
     }
 
-    let solver_func = if opt.tokensolver {
-        tokensolver::solve
-    } else {
-        transitionsolver::solve
-    };
+    let solver_func = transitionsolver::solve;
 
     if let Some(filename) = opt.input {
         let problem = {
@@ -46,13 +38,16 @@ fn main() {
         };
 
         let minimizecores = opt.minimizecores;
-        let result = print_calc_time(filename.to_str().unwrap(), || solver_func(&problem, minimizecores));
+        let result = print_calc_time(filename.to_str().unwrap(), || {
+            solver_func(&problem, minimizecores)
+        });
         match result {
             Ok(solution) => {
                 println!("Solved.");
 
                 if let Some(output) = opt.output {
-                    std::fs::write(&output, serde_json::to_string_pretty(&solution).unwrap()).unwrap();
+                    std::fs::write(&output, serde_json::to_string_pretty(&solution).unwrap())
+                        .unwrap();
 
                     println!("Wrote to file '{}'", output.to_str().unwrap());
                 }
@@ -71,7 +66,9 @@ fn main() {
 fn perftest() {
     let mut problem_names = Vec::new();
     for plates in [1, 2] {
-        for n_carbonaras in [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 15, 20, 25, 30, 40, 50, 75, 100] {
+        for n_carbonaras in [
+            1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 15, 20, 25, 30, 40, 50, 75, 100,
+        ] {
             let problem_name = format!("carbonara_{}p_{}c", plates, n_carbonaras);
             problem_names.push(problem_name);
         }

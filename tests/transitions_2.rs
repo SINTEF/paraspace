@@ -1,4 +1,4 @@
-use paraspace::{problem::*, tokensolver::solve};
+use paraspace::{problem::*, transitionsolver::solve};
 
 #[test]
 pub fn transitions_2() {
