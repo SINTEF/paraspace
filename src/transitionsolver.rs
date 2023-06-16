@@ -1,12 +1,24 @@
+use crate::{
+    problem::{
+        self, Problem, Solution, SolutionTimeline, SolutionToken, TemporalRelationship, TokenTime,
+    },
+    transitionrelation::{transitionrelation, TransitionRelation},
+    z3real_value, SolverError,
+};
 use std::collections::{HashMap, HashSet};
-
 use z3::ast::{Ast, Bool, Real};
 
-use crate::{
-    from_z3_real,
-    problem::{self, ObjectSet, Problem, Solution, SolutionToken, TemporalRelationship, TokenTime},
-    SolverError,
-};
+struct SolverSettings {
+    minimize_cores: bool,
+}
+
+impl Default for SolverSettings {
+    fn default() -> Self {
+        SolverSettings {
+            minimize_cores: false,
+        }
+    }
+}
 
 // A state is a choice between several possible tokens
 // in the sequence of values that make up a timeline.
@@ -30,7 +42,7 @@ struct Token<'a, 'z> {
 
 struct Condition<'a, 'z3> {
     token_idx: usize,
-    cond_spec: &'a problem::Condition,
+    cond_spec: &'a Vec<problem::Condition>,
     token_queue: usize,
     alternatives_extension: Option<Bool<'z3>>,
 }
