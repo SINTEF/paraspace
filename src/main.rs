@@ -39,7 +39,7 @@ fn main() {
 
         let minimizecores = opt.minimizecores;
         let result = print_calc_time(filename.to_str().unwrap(), || {
-            solver_func(&problem, minimizecores)
+            solver_func(&problem, &Default::default())
         });
         match result {
             Ok(solution) => {
@@ -92,7 +92,7 @@ fn perftest() {
 
         // println!("Problem:\n{:#?}", problem);
         // println!("Solving...");
-        let result = print_calc_time(&problem_name, || transitionsolver::solve(&problem, false));
+        let result = print_calc_time(&problem_name, || transitionsolver::solve(&problem, &Default::default()));
         match result {
             Ok(solution) => {
                 // println!("Success!");

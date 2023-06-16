@@ -14,23 +14,23 @@ pub fn transitions_2() {
                 },
                 TokenType {
                     value: "s2".to_string(),
-                    conditions: vec![Condition {
+                    conditions: vec![vec![Condition {
                         temporal_relationship: TemporalRelationship::MetBy,
                         amount: 0,
                         timeline_ref: "obj".to_string(),
                         value: "s1".to_string(),
-                    }],
+                    }]],
                     duration_limits: (1, None),
                     capacity: 0,
                 },
                 TokenType {
                     value: "s3".to_string(),
-                    conditions: vec![Condition {
+                    conditions: vec![vec![Condition {
                         temporal_relationship: TemporalRelationship::MetBy,
                         amount: 0,
                         timeline_ref: "obj".to_string(),
                         value: "s2".to_string(),
-                    }],
+                    }]],
                     duration_limits: (1, None),
                     capacity: 0,
                 },
@@ -44,14 +44,14 @@ pub fn transitions_2() {
         }],
     };
 
-    let solution = solve(&problem, false).unwrap();
+    let solution = solve(&problem, &Default::default()).unwrap();
     println!("SOLUTION {:#?}", solution);
 
-    assert!(solution.timelines.len() == 3);
+    assert!(solution.timelines.len() == 1);
 
-    let token0 = &solution.timelines[2];
-    let token1 = &solution.timelines[1];
-    let token2 = &solution.timelines[0];
+    let token0 = &solution.timelines[0].tokens[0];
+    let token1 = &solution.timelines[0].tokens[1];
+    let token2 = &solution.timelines[0].tokens[2];   
 
     assert!(token0.value == "s1");
     assert!(token1.value == "s2");
@@ -59,5 +59,5 @@ pub fn transitions_2() {
     assert!(token0.end_time - token0.start_time >= 5. && token0.end_time - token0.start_time <= 6.);
     assert!((token1.end_time - token2.start_time).abs() < 1e-5);
     assert!((token0.end_time - token1.start_time).abs() < 1e-5);
-    assert!(token2.end_time.is_infinite());
+    assert!(token2.end_time == solution.end_of_time);
 }

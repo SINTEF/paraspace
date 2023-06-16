@@ -49,12 +49,12 @@ impl Condition {
                 self.temporal_relationship,
                 TemporalRelationship::MetByTransitionFrom
             ))
-            && self.object.is_singleton_of(timeline))
+            && self.timeline_ref == timeline )
         .then(|| self.value.as_str())
     }
     pub fn is_timeline_transition_to(&self, timeline: &str) -> Option<&str> {
         (matches!(self.temporal_relationship, TemporalRelationship::Meets)
-            && self.object.is_singleton_of(timeline))
+            && self.timeline_ref == timeline)
         .then(|| self.value.as_str())
     }
 }
@@ -76,6 +76,7 @@ pub enum TemporalRelationship {
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Solution {
     pub timelines: Vec<SolutionTimeline>,
+    pub end_of_time :f32,
 }
 
 #[derive(Serialize, Deserialize, Debug)]

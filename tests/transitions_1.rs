@@ -14,12 +14,12 @@ pub fn transitions_1() {
                 },
                 TokenType {
                     value: "s2".to_string(),
-                    conditions: vec![Condition {
+                    conditions: vec![vec![Condition {
                         temporal_relationship: TemporalRelationship::MetBy,
                         amount: 0,
-                        other_timeline: "obj".to_string().
+                        timeline_ref: "obj".to_string(),
                         value: "s1".to_string(),
-                    }],
+                    }]],
                     duration_limits: (1, None),
                     capacity: 0,
                 },
@@ -35,11 +35,12 @@ pub fn transitions_1() {
 
     println!("{}", serde_json::to_string(&problem).unwrap());
 
-    let solution = transitionsolver::solve(&problem, false).unwrap();
+    let solution = transitionsolver::solve(&problem, &Default::default()).unwrap();
     println!("SOLUTION {:#?}", solution);
-    assert!(solution.timelines.len() == 2);
-    let token1 = &solution.timelines[0];
-    let token2 = &solution.timelines[1];
+    assert!(solution.timelines.len() == 1);
+
+    let token1 = &solution.timelines[0].tokens[0];
+    let token2 = &solution.timelines[0].tokens[1];
     assert!(token1.value == "s1");
     assert!(token2.value == "s2");
     assert!(token1.end_time - token1.start_time >= 5. && token1.end_time - token1.start_time <= 6.);
@@ -70,7 +71,7 @@ pub fn unrestricted_transitions() {
             ],
             static_tokens: vec![Token {
                 value: "s1".to_string(),
-                const_time: TokenTime::Fact(None, Some(0)),
+                const_time: TokenTime::Fact(Some(0), Some(5)),
                 capacity: 0,
                 conditions: vec![],
             },Token {
@@ -85,12 +86,13 @@ pub fn unrestricted_transitions() {
     println!("{:#?}", problem);
     println!("{}", serde_json::to_string(&problem).unwrap());
 
-    let solution = transitionsolver::solve(&problem, false).unwrap();
+    let solution = transitionsolver::solve(&problem, &Default::default()).unwrap();
     println!("SOLUTION {:#?}", solution);
-    assert!(solution.timelines.len() == 2);
-    let token1 = &solution.timelines[0];
-    let token2 = &solution.timelines[1];
-    assert!(token1.value == "s1");
+    assert!(solution.timelines.len() == 1);
+
+    let token1 = &solution.timelines[0].tokens[0];
+    let token2 = &solution.timelines[0].tokens[1];   
+     assert!(token1.value == "s1");
     assert!(token2.value == "s2");
     assert!(token1.end_time - token1.start_time >= 5. && token1.end_time - token1.start_time <= 6.);
     assert!((token1.end_time - token2.start_time).abs() < 1e-5);
