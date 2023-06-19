@@ -5,47 +5,46 @@ import pyparaspace
 
 def test_pyparaspace():
     problem = pyparaspace.Problem(
-        groups=[],
         timelines=[
             pyparaspace.Timeline(
                 name="obj",
-                values=[
+                token_types=[
                     pyparaspace.Value(
-                        name="s1", conditions=[], duration=(5, 6), capacity=0
+                        value="s1", conditions=[], duration_limits=(5, 6), capacity=0
                     ),
                     pyparaspace.Value(
-                        name="s2",
+                        value="s2",
                         conditions=[
-                            pyparaspace.Condition(
-                                temporal_relationship=pyparaspace.TemporalRelationship.MetBy,
+                            pyparaspace.TemporalCond(
+                                temporal_relation=pyparaspace.TemporalRelation.MetBy,
                                 amount=0,
-                                objects=["obj"],
+                                timeline="obj",
                                 value="s1",
                             )
                         ],
-                        duration=(1, None),
+                        duration_limits=(1, None),
                         capacity=0,
                     ),
                 ],
-            )
-        ],
-        tokens=[
-            pyparaspace.Token(
-                timeline_name="obj",
-                value="s2",
-                const_time=pyparaspace.goal(),
-                capacity=0,
-                conditions=[],
+                static_tokens=[
+                    pyparaspace.StaticToken(
+                        value="s2",
+                        const_time=pyparaspace.goal(),
+                        capacity=0,
+                        conditions=[],
+                    )
+                ],
             )
         ],
     )
 
     solution = pyparaspace.solve(problem)
     print(f"Solution: {solution}")
-    assert len(solution.tokens) == 2, "Number of tokens should be 2"
+    timeline = solution.timelines[0]
+    assert len(timeline.tokens) == 2, "Number of tokens should be 2"
 
-    token1 = solution.tokens[0]
-    token2 = solution.tokens[1]
+    token1 = timeline.tokens[0]
+    token2 = timeline.tokens[1]
     assert token1.value == "s1", "Token value 1 should be s1"
     assert token2.value == "s2", "Token value 2 should be s2"
 
