@@ -326,6 +326,7 @@ pub enum TemporalRelationPy {
     MetBy,
     MetByTransitionFrom,
     Meets,
+    Starts,
     Cover,
     Equal,
     StartsAfter,
@@ -571,6 +572,7 @@ fn convert_conditions(cond: Vec<Vec<TemporalCondPy>>) -> Vec<Vec<Condition>> {
                         TemporalRelationPy::Cover => TemporalRelationship::Cover,
                         TemporalRelationPy::Equal => TemporalRelationship::Equal,
                         TemporalRelationPy::StartsAfter => TemporalRelationship::StartsAfter,
+                        TemporalRelationPy::Starts => TemporalRelationship::Starts,
                     },
                 })
                 .collect()
