@@ -8,6 +8,10 @@ pub fn solve_json(input :String) -> String {
     "".to_string()
 }
 
+pub fn to_json(input :&problem::Problem) -> String {
+    serde_json::to_string_pretty(input).unwrap()
+}
+
 pub fn print_calc_time<T>(name: &str, f: impl FnOnce() -> T) -> T{
     use std::time::Instant;
     let now = Instant::now();
