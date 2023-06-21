@@ -54,3 +54,9 @@ which makes it requires a bit of setup to correcly build the manylinux wheel.
 There is a Dockerfile available that can be used to build a Docker image with 
 an up-to-date Rust version and version 7 of the LLVM/Clang toolchain.
 
+The builds should work using the following commands.
+```
+docker build -t mybuild .
+docker run --rm -v $(pwd):/io mybuild publish --skip-existing --compatibility manylinux2014 -i python3.10
+```
+
