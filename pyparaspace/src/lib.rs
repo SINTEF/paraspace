@@ -405,9 +405,13 @@ impl SolutionTokenPy {
 }
 
 #[pyfunction]
+fn as_json(problem :ProblemArgument) -> PyResult<String> {
+    let problem = convert_problem_arguments(problem);
+    Ok(paraspace::to_json(&problem))
+}
 
-fn solve(problem: ProblemArgument) -> PyResult<SolutionPy> {
-    let problem = match problem {
+fn convert_problem_arguments(problem :ProblemArgument) -> Problem {
+    match problem {
         ProblemArgument::ProblemPy(p) => convert_problem(p),
         ProblemArgument::TimelinesList(l) => Problem {
             timelines: l.into_iter().map(convert_timeline).collect(),
@@ -436,7 +440,13 @@ fn solve(problem: ProblemArgument) -> PyResult<SolutionPy> {
                 })
                 .collect(),
         },
-    };
+    }
+}
+
+#[pyfunction]
+
+fn solve(problem: ProblemArgument) -> PyResult<SolutionPy> {
+    let problem = convert_problem_arguments(problem);
     match paraspace::transitionsolver::solve(&problem, &Default::default()) {
         Ok(s) => Ok(SolutionPy {
             timelines: s
@@ -479,6 +489,7 @@ fn fact(a: Option<usize>, b: Option<usize>) -> TokenTimePy {
 #[pymodule]
 fn pyparaspace(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(solve, m)?)?;
+    m.add_function(wrap_pyfunction!(as_json, m)?)?;
     m.add_function(wrap_pyfunction!(goal, m)?)?;
     m.add_function(wrap_pyfunction!(fact, m)?)?;
 
