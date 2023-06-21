@@ -776,6 +776,10 @@ pub fn solve(problem: &Problem, settings: &SolverSettings) -> Result<Solution, S
                                 &states[tokens[token_idx].state].end_time,
                                 &states[tokens[conds[cond_idx].token_idx].state].start_time,
                             )],
+                            TemporalRelationship::Starts => vec![Real::_eq(
+                                &states[tokens[token_idx].state].start_time,
+                                &states[tokens[conds[cond_idx].token_idx].state].start_time,
+                            )],
                             TemporalRelationship::StartsAfter => vec![Real::le(
                                 &states[tokens[token_idx].state].start_time,
                                 &states[tokens[conds[cond_idx].token_idx].state].start_time,
