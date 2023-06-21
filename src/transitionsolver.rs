@@ -24,6 +24,7 @@ impl Default for SolverSettings {
 
 // A state is a choice between several possible tokens
 // in the sequence of values that make up a timeline.
+#[derive(Debug)]
 struct State<'z> {
     start_time: Real<'z>,
     end_time: Real<'z>,
@@ -35,6 +36,7 @@ struct State<'z> {
     can_expand: bool,
 }
 
+#[derive(Debug)]
 struct Token<'a, 'z> {
     active: Option<Bool<'z>>,
     state: usize,
@@ -43,6 +45,7 @@ struct Token<'a, 'z> {
     conditions: Vec<usize>,
 }
 
+#[derive(Debug)]
 struct Condition<'a, 'z3> {
     active: Option<Bool<'z3>>,
     token_idx: usize,
@@ -746,7 +749,7 @@ pub fn solve(problem: &Problem, settings: &SolverSettings) -> Result<Solution, S
 
                     let need_alternatives = old_expansion_lit
                         .clone()
-                        .or_else(|| tokens[conds[cond_idx].token_idx].active.clone());
+                        .or_else(|| conds[cond_idx].active.clone());
 
                     if let Some(cond) = need_alternatives {
                         // println!("added need alternatives {:?}", old_expansion_lit);

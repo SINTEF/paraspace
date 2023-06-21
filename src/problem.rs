@@ -64,6 +64,7 @@ pub enum TemporalRelationship {
     MetBy,
     MetByTransitionFrom,
     Meets,
+    Starts,
     Cover,
     Equal,
     StartsAfter,
