@@ -90,7 +90,7 @@ impl TimelinePy {
 // TOKEN TYPE
 //
 
-#[pyclass(name = "Value")]
+#[pyclass(name = "TokenType")]
 #[derive(Clone, Debug)]
 pub struct TokenTypePy {
     #[pyo3(get)]
@@ -121,7 +121,7 @@ impl TokenTypePy {
 
     fn __repr__(&self) -> String {
         format!(
-            "Value(name: {}, duration: {:?}, conditions: {}, capacity: {})",
+            "TokenType(name: {}, duration: {:?}, conditions: {}, capacity: {})",
             self.value,
             self.duration_limits,
             repr_conditions(&self.conditions),
