@@ -9,10 +9,10 @@ def test_pyparaspace():
             pyparaspace.Timeline(
                 name="obj",
                 token_types=[
-                    pyparaspace.Value(
+                    pyparaspace.TokenType(
                         value="s1", conditions=[], duration_limits=(5, 6), capacity=0
                     ),
-                    pyparaspace.Value(
+                    pyparaspace.TokenType(
                         value="s2",
                         conditions=[
                             pyparaspace.TemporalCond(
