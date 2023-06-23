@@ -327,6 +327,8 @@ pub enum TemporalRelationPy {
     MetByTransitionFrom,
     Meets,
     Starts,
+    StartPrecond,
+    StartEffect,
     Cover,
     Equal,
     StartsAfter,
@@ -573,9 +575,12 @@ fn convert_conditions(cond: Vec<Vec<TemporalCondPy>>) -> Vec<Vec<Condition>> {
                         TemporalRelationPy::Equal => TemporalRelationship::Equal,
                         TemporalRelationPy::StartsAfter => TemporalRelationship::StartsAfter,
                         TemporalRelationPy::Starts => TemporalRelationship::Starts,
+                        TemporalRelationPy::StartPrecond => TemporalRelationship::StartPrecond,
+                        TemporalRelationPy::StartEffect => TemporalRelationship::StartEffect,
                     },
                 })
                 .collect()
         })
         .collect()
 }
+
