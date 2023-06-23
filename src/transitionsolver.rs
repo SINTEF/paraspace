@@ -794,6 +794,40 @@ pub fn solve(problem: &Problem, settings: &SolverSettings) -> Result<Solution, S
                                     &states[tokens[token_idx].state].end_time,
                                 ),
                             ],
+                            TemporalRelationship::StartPrecond => vec![
+                                Real::le(
+                                    &Real::add(
+                                        &ctx,
+                                        &[
+                                            &states[tokens[conds[cond_idx].token_idx].state]
+                                                .start_time,
+                                            &Real::from_real(&ctx, 1_i32, 1), // TODO configurable epsilon
+                                        ],
+                                    ),
+                                    &states[tokens[token_idx].state].start_time,
+                                ),
+                                Real::le(
+                                    &states[tokens[token_idx].state].start_time,
+                                    &states[tokens[conds[cond_idx].token_idx].state].end_time,
+                                ),
+                            ],
+                            TemporalRelationship::StartEffect => vec![
+                                Real::le(
+                                    &states[tokens[conds[cond_idx].token_idx].state].start_time,
+                                    &states[tokens[token_idx].state].start_time,
+                                ),
+                                Real::le(
+                                    &states[tokens[token_idx].state].start_time,
+                                    &Real::add(
+                                        &ctx,
+                                        &[
+                                            &states[tokens[conds[cond_idx].token_idx].state]
+                                                .end_time,
+                                            &Real::from_real(&ctx, 1_i32, 1), // TODO configurable epsilon
+                                        ],
+                                    ),
+                                ),
+                            ],
                             TemporalRelationship::Equal => vec![
                                 Real::_eq(
                                     &states[tokens[token_idx].state].start_time,
