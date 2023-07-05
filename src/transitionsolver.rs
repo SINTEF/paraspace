@@ -148,10 +148,14 @@ pub fn solve(problem: &Problem, settings: &SolverSettings) -> Result<Solution, S
                     tokens: vec![token_idx],
                     start_time: start_time
                         .map(|t| Real::from_real(&ctx, t as i32, 1))
-                        .unwrap_or_else(|| Real::fresh_const(&ctx, "t")),
+                        .unwrap_or_else(|| {
+                            Real::fresh_const(&ctx, &format!("t_{}_s_", tl_spec.name))
+                        }),
                     end_time: end_time
                         .map(|t| Real::from_real(&ctx, t as i32, 1))
-                        .unwrap_or_else(|| Real::fresh_const(&ctx, "t")),
+                        .unwrap_or_else(|| {
+                            Real::fresh_const(&ctx, &format!("t_{}_e_", tl_spec.name))
+                        }),
                     timeline: tl_idx,
                     active: Bool::from_bool(&ctx, true),
                     activate_next: Bool::fresh_const(&ctx, "nxstate"),
@@ -447,8 +451,11 @@ pub fn solve(problem: &Problem, settings: &SolverSettings) -> Result<Solution, S
                     continue;
                 }
 
-
-                println!("EXPANDING TOKEN {}.{}", timeline_names[states[tokens[token_idx].state].timeline], tokens[token_idx].value);
+                println!(
+                    "EXPANDING TOKEN {}.{}",
+                    timeline_names[states[tokens[token_idx].state].timeline],
+                    tokens[token_idx].value
+                );
                 let token_type = problem.timelines[states[tokens[token_idx].state].timeline]
                     .token_types
                     .iter()
@@ -477,7 +484,7 @@ pub fn solve(problem: &Problem, settings: &SolverSettings) -> Result<Solution, S
                     ),
                     &states[tokens[token_idx].state].end_time,
                 );
-                println!("prec {:?}", prec) ;
+                println!("prec {:?}", prec);
                 if let Some(cond) = tokens[token_idx].active.as_ref() {
                     solver.assert(&Bool::implies(cond, prec))
                 } else {
@@ -761,88 +768,69 @@ pub fn solve(problem: &Problem, settings: &SolverSettings) -> Result<Solution, S
                         // Represents the usage of the causal link.
                         let choose_link = (!const_link).then(|| Bool::fresh_const(&ctx, "cl"));
 
+                        let this_state = &states[tokens[conds[cond_idx].token_idx].state];
+                        let target_state = &states[tokens[token_idx].state];
+
                         let temporal_rel = match conds[cond_idx].cond_spec.temporal_relationship {
                             TemporalRelationship::MetByTransitionFrom => {
                                 // // The target token should have a next value to transition to.
                                 vec![
-                                    states[tokens[token_idx].state].activate_next.clone(),
-                                    Real::_eq(
-                                        &states[tokens[token_idx].state].end_time,
-                                        &states[tokens[conds[cond_idx].token_idx].state].start_time,
-                                    ),
+                                    target_state.activate_next.clone(),
+                                    Real::_eq(&target_state.end_time, &this_state.start_time),
                                 ]
                             }
-                            TemporalRelationship::MetBy => vec![Real::_eq(
-                                &states[tokens[token_idx].state].end_time,
-                                &states[tokens[conds[cond_idx].token_idx].state].start_time,
-                            )],
-                            TemporalRelationship::Starts => vec![Real::_eq(
-                                &states[tokens[token_idx].state].start_time,
-                                &states[tokens[conds[cond_idx].token_idx].state].start_time,
-                            )],
-                            TemporalRelationship::StartsAfter => vec![Real::le(
-                                &states[tokens[token_idx].state].start_time,
-                                &states[tokens[conds[cond_idx].token_idx].state].start_time,
-                            )],
+                            TemporalRelationship::MetBy => {
+                                vec![Real::_eq(&target_state.end_time, &this_state.start_time)]
+                            }
+                            TemporalRelationship::Starts => {
+                                vec![Real::_eq(&target_state.start_time, &this_state.start_time)]
+                            }
+                            TemporalRelationship::StartsAfter => {
+                                vec![Real::le(&target_state.start_time, &this_state.start_time)]
+                            }
                             TemporalRelationship::Cover => vec![
-                                Real::le(
-                                    &states[tokens[token_idx].state].start_time,
-                                    &states[tokens[conds[cond_idx].token_idx].state].start_time,
-                                ),
-                                Real::le(
-                                    &states[tokens[conds[cond_idx].token_idx].state].end_time,
-                                    &states[tokens[token_idx].state].end_time,
-                                ),
+                                Real::le(&target_state.start_time, &this_state.start_time),
+                                Real::le(&this_state.end_time, &target_state.end_time),
                             ],
                             TemporalRelationship::StartPrecond => vec![
                                 Real::le(
                                     &Real::add(
                                         &ctx,
                                         &[
-                                            &states[tokens[conds[cond_idx].token_idx].state]
-                                                .start_time,
+                                            &target_state.start_time,
                                             &Real::from_real(&ctx, 1_i32, 1), // TODO configurable epsilon
                                         ],
                                     ),
-                                    &states[tokens[token_idx].state].start_time,
+                                    &this_state.start_time,
                                 ),
-                                Real::le(
-                                    &states[tokens[token_idx].state].start_time,
-                                    &states[tokens[conds[cond_idx].token_idx].state].end_time,
-                                ),
+                                Real::le(&this_state.start_time, &target_state.end_time),
                             ],
                             TemporalRelationship::StartEffect => vec![
+                                Real::le(&target_state.start_time, &this_state.start_time),
                                 Real::le(
-                                    &states[tokens[conds[cond_idx].token_idx].state].start_time,
-                                    &states[tokens[token_idx].state].start_time,
-                                ),
-                                Real::le(
-                                    &states[tokens[token_idx].state].start_time,
                                     &Real::add(
                                         &ctx,
                                         &[
-                                            &states[tokens[conds[cond_idx].token_idx].state]
-                                                .end_time,
+                                            &this_state.start_time,
                                             &Real::from_real(&ctx, 1_i32, 1), // TODO configurable epsilon
                                         ],
                                     ),
+                                    &target_state.end_time,
                                 ),
                             ],
                             TemporalRelationship::Equal => vec![
-                                Real::_eq(
-                                    &states[tokens[token_idx].state].start_time,
-                                    &states[tokens[conds[cond_idx].token_idx].state].start_time,
-                                ),
-                                Real::_eq(
-                                    &states[tokens[conds[cond_idx].token_idx].state].end_time,
-                                    &states[tokens[token_idx].state].end_time,
-                                ),
+                                Real::_eq(&this_state.start_time, &target_state.start_time),
+                                Real::_eq(&this_state.end_time, &target_state.end_time),
                             ],
-                            TemporalRelationship::Meets => vec![Real::_eq(
-                                &states[tokens[token_idx].state].start_time,
-                                &states[tokens[conds[cond_idx].token_idx].state].end_time,
-                            )],
+                            TemporalRelationship::Meets => {
+                                vec![Real::_eq(&target_state.start_time, &this_state.end_time)]
+                            }
                         };
+
+                        println!(
+                            "TEMPORAL {:?} {:?}",
+                            conds[cond_idx].cond_spec, temporal_rel
+                        );
 
                         if conds[cond_idx].cond_spec.amount > 0 {
                             let rc = resource_constraints.entry(token_idx).or_default();
@@ -1110,6 +1098,10 @@ pub fn solve(problem: &Problem, settings: &SolverSettings) -> Result<Solution, S
         // panic!();
 
         n_smt_calls += 1;
+        println!(
+            "ASSUMPTIONS {:?}",
+            neg_expansions.keys().cloned().collect::<Vec<_>>()
+        );
         let result = solver.check_assumptions(&neg_expansions.keys().cloned().collect::<Vec<_>>());
         drop(p);
 
@@ -1385,10 +1377,18 @@ fn expand_n<'a, 'z>(
 
                 (seq, prev_state.end_time.clone(), Some(prev_values))
             } else {
-                (0, Real::fresh_const(ctx, "t"), None)
+                (
+                    0,
+                    Real::fresh_const(
+                        ctx,
+                        &format!("t_{}_init_", problem.timelines[timeline_idx].name),
+                    ),
+                    None,
+                )
             };
 
-        let end_time = Real::fresh_const(ctx, "t");
+        let end_time =
+            Real::fresh_const(ctx, &format!("t_{}_", problem.timelines[timeline_idx].name));
 
         let state_idx = states.len();
         let token_start_idx = tokens.len();
@@ -1401,7 +1401,8 @@ fn expand_n<'a, 'z>(
 
         let state_tokens = values
             .iter()
-            .map(|value| {
+            .enumerate()
+            .map(|(idx, value)| {
                 // let prev_unique = prev_values.is_none() || prev_values.as_ref().unwrap().len() == 1;
                 // let active = if prev_unique && values.len() == 1 {
                 //     None // only one chocie heree
@@ -1409,7 +1410,15 @@ fn expand_n<'a, 'z>(
                 //     Some(Bool::fresh_const(ctx, "x"))
                 // };
 
-                let active = Some(Bool::fresh_const(ctx, "x"));
+                let active = Some(Bool::fresh_const(
+                    ctx,
+                    &format!(
+                        "state_{}_{}_{}_",
+                        problem.timelines[timeline_idx].name,
+                        timelines[timeline_idx].states.len(),
+                        idx
+                    ),
+                ));
 
                 Token {
                     active,

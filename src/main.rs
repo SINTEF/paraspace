@@ -43,7 +43,19 @@ fn main() {
         });
         match result {
             Ok(solution) => {
-                println!("Solved.");
+                println!("Solved.  (end of time = {})", solution.end_of_time);
+                for timeline in solution.timelines.iter() {
+                    println!(
+                        "Timeline \"{}\": {}",
+                        timeline.name,
+                        timeline
+                            .tokens
+                            .iter()
+                            .map(|t| format!("({},{},{})", t.value, t.start_time, t.end_time))
+                            .collect::<Vec<_>>()
+                            .join(", ")
+                    )
+                }
 
                 if let Some(output) = opt.output {
                     std::fs::write(&output, serde_json::to_string_pretty(&solution).unwrap())
@@ -92,7 +104,9 @@ fn perftest() {
 
         // println!("Problem:\n{:#?}", problem);
         // println!("Solving...");
-        let result = print_calc_time(&problem_name, || transitionsolver::solve(&problem, &Default::default()));
+        let result = print_calc_time(&problem_name, || {
+            transitionsolver::solve(&problem, &Default::default())
+        });
         match result {
             Ok(solution) => {
                 // println!("Success!");
