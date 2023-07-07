@@ -1,0 +1,35 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "up-paraspace"
+dynamic = ["version"]
+description = ''
+readme = "README.md"
+requires-python = ">=3.10"
+license = "MIT"
+keywords = []
+authors = [
+  { name = "Bjørnar Luteberget", email = "bjornar.luteberget@sintef.no" },
+]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Programming Language :: Python",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: Implementation :: CPython",
+  "Programming Language :: Python :: Implementation :: PyPy",
+]
+dependencies = [
+  "pyparaspace==0.1.5"
+]
+
+[project.urls]
+Documentation = "https://github.com/luteberget/up-paraspace#readme"
+Issues = "https://github.com/luteberget/up-paraspace/issues"
+Source = "https://github.com/luteberget/up-paraspace"
+
+[tool.hatch.version]
+path = "src/up_paraspace/__about__.py"
+
