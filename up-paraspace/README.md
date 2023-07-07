@@ -20,7 +20,7 @@ pip install unified-planning up-paraspace
 
 ```
 from unified_planning.shortcuts import *
-import up-paraspace
+import up_paraspace
 
 problem = Problem('myproblem')
 # specify the problem (e.g. fluents, initial state, actions, goal)
