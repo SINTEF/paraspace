@@ -12,6 +12,10 @@ using Z3 and a novel abstraction refinement algorithm.
 Installing from PyPi is recommended because pre-built packages of ParaSpace's
 Python integration are available for Windows and Linux. 
 
+```
+pip install unified-planning up-paraspace
+```
+
 ## Usage
 
 ```
@@ -24,10 +28,7 @@ problem = Problem('myproblem')
 
 planner = OneshotPlanner(name="paraspace")
 result = planner.solve(problem)
-if result.status == PlanGenerationResultStatus.SOLVED_SATISFICING:
-    print(f'{Found a plan.\nThe plan is: {result.plan}')
-else:
-    print("No plan found.")
+print(result)
 ```
 
 
