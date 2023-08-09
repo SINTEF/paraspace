@@ -1,4 +1,3 @@
-import random
 from typing import Optional, Callable, IO
 from unified_planning.engines.results import PlanGenerationResultStatus
 import unified_planning as up
@@ -7,6 +6,7 @@ from unified_planning.shortcuts import *
 import pyparaspace as pps
 from collections import defaultdict
 import itertools
+from fractions import Fraction
 
 def type_name(t):
     if t.is_bool_type():
@@ -27,7 +27,7 @@ class ParaSpacePlanner(engines.Engine, engines.mixins.OneshotPlannerMixin):
         self.compilations = [CompilationKind.CONDITIONAL_EFFECTS_REMOVING,
                              CompilationKind.GROUNDING]
         self.action_map = {}
-
+        self.return_time_triggered_plan = False
     @property
     def name(self) -> str:
         return "paraspace"
@@ -41,10 +41,10 @@ class ParaSpacePlanner(engines.Engine, engines.mixins.OneshotPlannerMixin):
         supported_kind.set_fluents_type('OBJECT_FLUENTS')
         supported_kind.set_conditions_kind('EQUALITIES')
         supported_kind.set_conditions_kind('NEGATIVE_CONDITIONS')
-
         supported_kind.set_quality_metrics("OVERSUBSCRIPTION")
-        supported_kind.set_quality_metrics("FINAL_VALUE")
 
+        supported_kind.set_time('CONTINUOUS_TIME')
+        supported_kind.set_expression_duration('STATIC_FLUENTS_IN_DURATIONS')
         return supported_kind
 
     @staticmethod
@@ -73,26 +73,65 @@ class ParaSpacePlanner(engines.Engine, engines.mixins.OneshotPlannerMixin):
         prob = problem
         self.compiler_res = []
         for compKind in self.compilations:
-            with Compiler(problem_kind=prob.kind,compilation_kind=compKind) as compiler:
-                if compiler.supports(prob.kind):
+            # Check if you need to do a compilation before hand !! :)
+            try:
+                with Compiler(problem_kind=prob.kind,compilation_kind=compKind) as compiler:
                     res = compiler.compile(prob,compKind)
                     prob = res.problem
                     self.compiler_res += [res]
-                else:
-                    print("Certain compiler is not supported for ", compKind)
+            except Exception as e:
+                print(e)
         return prob
     
     def _decompile(self,solution):
-        actions = []
-        for timeline in solution.timelines:
-            if timeline.name == "actions":
-                for token in timeline.tokens:
-                    actions += [up.plans.plan.ActionInstance(self.action_map[token.value])]
-        plan = up.plans.sequential_plan.SequentialPlan(actions)
+        if self.return_time_triggered_plan:
+            actions = []
+            for timeline in solution.timelines:
+                if timeline.name == "actions":
+                    for token in timeline.tokens:
+                        if not token.value == "wAiT": # Remove syntatic wait action
+                            actions.append((Fraction(token.start_time),
+                                        up.plans.plan.ActionInstance(self.action_map[token.value]),
+                                        Fraction(token.end_time-token.start_time)))
+            plan = up.plans.time_triggered_plan.TimeTriggeredPlan(actions)
+        else:
+            actions = []
+            for timeline in solution.timelines:
+                if timeline.name == "actions":
+                    for token in timeline.tokens:
+                        actions.append(up.plans.plan.ActionInstance(self.action_map[token.value]))
+            plan = up.plans.sequential_plan.SequentialPlan(actions)
         for res in reversed(self.compiler_res):
             plan = plan.replace_action_instances(res.map_back_action_instance)
         return plan
     
+    def _decode_duration(self,action,problem):
+        statics = problem.get_static_fluents()
+        dur_lower = 0
+        if action.duration.lower.is_int_constant():
+            dur_lower = action.duration.lower.int_constant_value()
+        elif action.duration.lower.is_fluent_exp():
+            init_value = problem.initial_value(action.duration.lower)
+            if action.duration.lower.fluent() in statics and init_value.is_int_constant():
+                dur_lower = init_value.int_constant_value()
+            else:
+                raise Exception("Not supported duration fluent", action.duration)
+        else:
+            raise Exception("Not supported duration type", action.duration)
+        dur_upper = 0
+        if action.duration.upper.is_int_constant():
+            dur_upper = action.duration.upper.int_constant_value()
+        elif action.duration.upper.is_fluent_exp():
+            init_value = problem.initial_value(action.duration.upper)
+            if action.duration.upper.fluent() in statics and init_value.is_int_constant():
+                dur_upper = init_value.int_constant_value()
+            else:
+                raise Exception("Not supported duration fluent", action.duration)
+        else:
+            raise Exception("Not supported duration type", action.duration)
+        if dur_lower < 1 and dur_upper <1:
+            raise Exception("Do only support actions with duration longer than one")
+        return (dur_lower,dur_upper)
     def _decode_fnode(self,fnode,domains):
         if fnode.type.is_bool_type():
             if fnode.is_equals():
@@ -150,49 +189,110 @@ class ParaSpacePlanner(engines.Engine, engines.mixins.OneshotPlannerMixin):
         
         print(problem)
 
-        print("DOMAINS\n",domains)
+        #print("DOMAINS\n",domains)
         timelines = []
         statics = problem.get_static_fluents()
         action_values = []
         frame_cond = []
         self.action_map = {}
-
+        has_wAiT_action = False
         ## Make an action timeline
         for action in problem.actions:
             self.action_map[action.name] = action
             conditions = []
             preconditions = []
-            for pre in action.preconditions:
-                decoded_pre = self._decode_fnode(pre,domains)
-                or_conds = []
-                for d_ii in decoded_pre:
-                    timeline = d_ii[0]
-                    value = d_ii[1]
-                    if not (timeline,value) in preconditions:
-                        preconditions.append((timeline,value))
-                        or_conds.append(pps.TemporalCond(timeline,value,pps.TemporalRelation.StartPrecond,0))
-                if len(or_conds) > 0:
-                    conditions.append(pps.OrCond(or_conds))
-            for eff in action.effects:
-                if eff.is_assignment():
-                    timeline = str(eff.fluent)
-                    value = str(eff.value)
-                    conditions.append(pps.TemporalCond(timeline,value, pps.TemporalRelation.StartEffect,0))
-                    from_value = []
-                    for pre_ii in preconditions:
-                        if pre_ii[0] == timeline:
-                            from_value.append(pre_ii[1])
-                    frame_cond.append({"action":action.name,"timeline":timeline,
-                                    "value":value,"from_value":from_value})
-                else:
-                    raise "Effect kind not supported"+ str(eff.kind) 
-            action_values += [pps.TokenType(value=action.name,conditions=conditions,duration_limits=(1,None),capacity=0)]      
-
-        if len(action_values) == 0:
-            return up.plans.sequential_plan.SequentialPlan([])
-
-        # Action fix
-        timelines += [pps.Timeline(name="actions",token_types=action_values, static_tokens=[])]
+            if isinstance(action,type(up.model.action.DurativeAction(""))):
+                self.return_time_triggered_plan = True
+                duration = self._decode_duration(action,problem)
+                if action.simulated_effects != {}:
+                    raise Exception("Do not support simulated effects")
+                for timing, conds in action.conditions.items():
+                    if str(timing.lower) == str(timing.upper) == "start":
+                        for pre in conds:
+                            decoded_pre = self._decode_fnode(pre,domains)
+                            or_conds = []
+                            for d_ii in decoded_pre:
+                                timeline = d_ii[0]
+                                value = d_ii[1]
+                                if not (timeline,value) in preconditions:
+                                    preconditions.append((timeline,value))
+                                    or_conds.append(pps.TemporalCond(timeline,value,pps.TemporalRelation.StartPrecond,0))
+                            if len(or_conds) > 0:
+                                conditions.append(pps.OrCond(or_conds))
+                    else:
+                        raise Exception("Not supported timing kind",timing)
+                effs_from_start = []
+                effs_from_end = []
+                for timing, effs in action.effects.items():
+                    if timing.is_from_start():
+                        effs_from_start += effs
+                    elif timing.is_from_end():
+                        has_wAiT_action = True
+                        effs_from_end += effs
+                    else:
+                        raise Exception("Not supported Timing kind",timing) 
+                for eff in effs_from_start:
+                    if eff.is_assignment():
+                        timeline = str(eff.fluent)
+                        value = str(eff.value)
+                        conditions.append(pps.TemporalCond(timeline,value, pps.TemporalRelation.StartEffect,0))
+                        from_value = []
+                        for pre_ii in preconditions:
+                            if pre_ii[0] == timeline:
+                                from_value.append(pre_ii[1])
+                        frame_cond.append({"action":action.name,"timeline":timeline,
+                                        "value":value,"from_value":from_value,
+                                        "tempRel":pps.TemporalRelation.Starts})
+                    else:
+                        raise "Effect kind not supported"+ str(eff.kind)     
+                for eff in effs_from_end:
+                    if eff.is_assignment():
+                        timeline = str(eff.fluent)
+                        value = str(eff.value)
+                        conditions.append(pps.TemporalCond(timeline,value, pps.TemporalRelation.Meets,0))
+                        from_value = []
+                        for eff_ii in effs_from_start:
+                            if str(eff_ii.fluent) == timeline:
+                                from_value.append(str(eff_ii.value))
+                        if len(from_value) == 0:
+                            for pre_ii in preconditions:
+                                if pre_ii[0] == timeline:
+                                    from_value.append(pre_ii[1])
+                        frame_cond.append({"action":action.name,"timeline":timeline,
+                                            "value":value,"from_value":from_value,
+                                            "tempRel":pps.TemporalRelation.MetBy})                       
+                action_values.append(pps.TokenType(value=action.name,conditions=conditions,duration_limits=duration,capacity=0)) 
+            else:
+                for pre in action.preconditions:
+                    decoded_pre = self._decode_fnode(pre,domains)
+                    or_conds = []
+                    for d_ii in decoded_pre:
+                        timeline = d_ii[0]
+                        value = d_ii[1]
+                        if not (timeline,value) in preconditions:
+                            preconditions.append((timeline,value))
+                            or_conds.append(pps.TemporalCond(timeline,value,pps.TemporalRelation.StartPrecond,0))
+                    if len(or_conds) > 0:
+                        conditions.append(pps.OrCond(or_conds))
+                for eff in action.effects:
+                    if eff.is_assignment():
+                        timeline = str(eff.fluent)
+                        value = str(eff.value)
+                        conditions.append(pps.TemporalCond(timeline,value, pps.TemporalRelation.StartEffect,0))
+                        from_value = []
+                        for pre_ii in preconditions:
+                            if pre_ii[0] == timeline:
+                                from_value.append(pre_ii[1])
+                        frame_cond.append({"action":action.name,"timeline":timeline,
+                                        "value":value,"from_value":from_value,
+                                        "tempRel":pps.TemporalRelation.Starts})
+                    else:
+                        raise "Effect kind not supported"+ str(eff.kind) 
+                action_values.append(pps.TokenType(value=action.name,conditions=conditions,duration_limits=(1,None),capacity=0))      
+        if has_wAiT_action:
+            action_values.append(pps.TokenType(value="wAiT",conditions=[],duration_limits=(1,None),capacity=0))
+        # Make an action timeline
+        timelines.append(pps.Timeline(name="actions",token_types=action_values, static_tokens=[]))
         ## Add Goals and Facts
         inits = problem.initial_values
         static_tokens = defaultdict(list)
@@ -226,16 +326,15 @@ class ParaSpacePlanner(engines.Engine, engines.mixins.OneshotPlannerMixin):
         for ax in frame_cond:
             if ax["timeline"] in frame_cond_dict.keys():
                 if ax["value"] in frame_cond_dict[ax["timeline"]].keys():
-                    frame_cond_dict[ax["timeline"]][ax["value"]]["actions"] += [ax["action"]]
+                    frame_cond_dict[ax["timeline"]][ax["value"]]["actions"].append((ax["action"],ax["tempRel"]))
                     if not ax["from_value"] in frame_cond_dict[ax["timeline"]][ax["value"]]["dtg"]:
                         frame_cond_dict[ax["timeline"]][ax["value"]]["dtg"] += ax["from_value"]
                 else:
-                    frame_cond_dict[ax["timeline"]][ax["value"]] = {"actions":[ax["action"]],"dtg":ax["from_value"]}
+                    frame_cond_dict[ax["timeline"]][ax["value"]] = {"actions":[(ax["action"],ax["tempRel"])],"dtg":ax["from_value"]}
             else:
-                frame_cond_dict[ax["timeline"]] = {ax["value"]:{"actions":[ax["action"]],"dtg":ax["from_value"]}}
-
+                frame_cond_dict[ax["timeline"]] = {ax["value"]:{"actions":[(ax["action"],ax["tempRel"])],"dtg":ax["from_value"]}}
+        
         print(frame_cond_dict)
-
         # Add all fluents as timelines
         fluents = problem.fluents
         for fluent in problem.fluents:
@@ -259,9 +358,9 @@ class ParaSpacePlanner(engines.Engine, engines.mixins.OneshotPlannerMixin):
                         actions_with_this_effect = []
                         possible_previous_values = []
                         if value in frame_cond_dict[fluent.name].keys():
-                            for a in frame_cond_dict[fluent.name][value]["actions"]:
+                            for a,temp_rel in frame_cond_dict[fluent.name][value]["actions"]:
                                 actions_with_this_effect.append(pps.TemporalCond(
-                                    "actions",a,pps.TemporalRelation.Starts,0))
+                                    "actions",a,temp_rel,0))
                             for v_ii in frame_cond_dict[fluent.name][value]["dtg"]:
                                 possible_previous_values.append(pps.TemporalCond(fluent.name,v_ii,
                                                                                 pps.TemporalRelation.MetBy,
@@ -309,7 +408,6 @@ class ParaSpacePlanner(engines.Engine, engines.mixins.OneshotPlannerMixin):
             print("--tl finished")
 
         print(pps.as_json(problem_tl))
-
         solution = pps.solve(problem_tl)
         print("-------------------")
         print("Solution:")
