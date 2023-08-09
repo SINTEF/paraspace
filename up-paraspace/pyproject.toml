@@ -23,7 +23,8 @@ classifiers = [
 ]
 dependencies = [
   "pyparaspace==0.1.5",
-  "unified-planning~=1.0"
+  "unified-planning~=1.0",
+  "up-pyperplan~=1.0"
 ]
 
 [project.urls]
