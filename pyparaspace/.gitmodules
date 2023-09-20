@@ -1,0 +1,3 @@
+[submodule "deps/paraspace"]
+	path = deps/paraspace
+	url = https://github.com/luteberget/paraspace
