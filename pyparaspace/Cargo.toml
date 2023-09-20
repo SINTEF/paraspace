@@ -11,4 +11,4 @@ crate-type = ["cdylib"]
 [dependencies]
 pyo3 = { version = "0.18", features = ["indexmap"] }
 indexmap = "1.6"
-paraspace = { path = "deps/paraspace", features = ["static-link-z3"] }
+paraspace = { path = "..", features = ["static-link-z3"] }
