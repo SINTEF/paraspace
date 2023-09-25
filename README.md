@@ -99,7 +99,7 @@ print(result)
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
 # Contributing
-We welcome contributions! Please read our [Contribution Guidelines](docs/CONTRIBUTING) for details on how to get started.
+We welcome contributions! Please read our [Contribution Guidelines](docs/CONTRIBUTING.md) for details on how to get started.
 
 # Support and Contact
 If you have any auestions or need assistance, please contact us at bjornar.luteberget@sintef.no or synne.fossoy@sintef.no
