@@ -10,9 +10,9 @@ from engine import MySolverImpl
 
 def test_example(example):
     print(example.problem)
-
-    eng = MySolverImpl()
-    plan = eng._solve(example.problem)
+    planner = OneshotPlanner(name="paraspace")
+    result = planner.solve(example.problem)
+    plan = result.plan
     print(plan)
     print(example.plan)
     if plan == example.plan:
