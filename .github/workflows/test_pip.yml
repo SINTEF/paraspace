@@ -1,0 +1,28 @@
+name: Code Test (PyPi package pyparaspace)
+run-name: Code Test (PyPi package pyparaspace)
+on: [workflow_dispatch]
+jobs:
+  test:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: true
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        python-version: ['3.10']
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ matrix.python-version }}
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install pyparaspace
+        pip install pytest pytest-cov
+    - name: Test with pytest
+      run: |
+        pytest pyparaspace/testPyParaspace.py --cov
