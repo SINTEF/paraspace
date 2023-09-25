@@ -21,19 +21,23 @@ def run_example(example):
         
         return validation_result.status == ValidationResultStatus.VALID
 
-examples = {}
-examples.update({ "minimal_" + k: v for k,v in minimal_examples().items()})
-examples.update({ "realistic_" + k: v for k,v in realistic_examples().items()})
+def test_upf():
+    examples = {}
+    examples.update({ "minimal_" + k: v for k,v in minimal_examples().items()})
+    examples.update({ "realistic_" + k: v for k,v in realistic_examples().items()})
+    
+    results = []
+    for name, example in examples.items():
+        ok = False
+        try:
+            ok = run_example(example)
+            assert not ok
+            results.append((name,ok,None))
+        except Exception as e:
+            results.append((name,ok,str(e).split("\n")[0]))
+    
+    for name,ok,err in results:
+        print(name,ok,err)
 
-results = []
-for name, example in examples.items():
-    ok = False
-    try:
-        ok = run_example(example)
-        assert not ok
-        results.append((name,ok,None))
-    except Exception as e:
-        results.append((name,ok,str(e).split("\n")[0]))
-
-for name,ok,err in results:
-    print(name,ok,err)
+if __name__=="__main__":
+    test_upf()
