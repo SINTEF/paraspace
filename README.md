@@ -1,6 +1,8 @@
 # ParaSpace timelines planner
 
-A simple, flexible and extensible solver for timeline-based planning problems using [Z3 Theorem Prover](https://github.com/Z3Prover/z3) and a novel abstraction refinement algorithm. The method used for the solver is described in this [paper](https://www.sciencedirect.com/science/article/pii/S2405896322024764). The aim of the solver is to better solve scheduling-heavy problems. 
+A simple, flexible and extensible solver for timeline-based planning problems using [Z3 Theorem Prover](https://github.com/Z3Prover/z3) and a novel abstraction refinement algorithm. The method used for the solver is described in this [paper](https://www.sciencedirect.com/science/article/pii/S2405896322024764). 
+% why this solver?
+The aim of the solver is to better solve scheduling-heavy problems. 
 
 # Installation
 
@@ -95,6 +97,9 @@ result = planner.solve(problem)
 print(result)
 ```
 
+# Short API Documentation
+A short API documentation of the most essential dataypes and function of the paraspace software is given in [Documentation](docs/Documentation.md) file.
+
 # Licence
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
@@ -103,3 +108,7 @@ We welcome contributions! Please read our [Contribution Guidelines](docs/CONTRIB
 
 # Support and Contact
 If you have any auestions or need assistance, please contact us at bjornar.luteberget@sintef.no or synne.fossoy@sintef.no
+
+# Acknowledgments
+The paraspace libary has been developed as part of the [ROBPLAN](https://www.sintef.no/en/projects/2021/robplan/) project funded by the Norwegian Research Council (RCN), grant number 322744.
+The UPF-integration of paraspace has been developed for the [AIPLAN4EU](https://aiplan4eu-project.eu) H2020 project, grant number 101016442.
