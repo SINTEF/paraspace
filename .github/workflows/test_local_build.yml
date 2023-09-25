@@ -1,0 +1,25 @@
+name: Code Test (local build)
+run-name: Code Test (local build)
+on: [workflow_dispatch]
+jobs:
+  test:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: true
+      matrix:
+        os: [ubuntu-latest]
+
+    steps:
+    - uses: actions/checkout@v3
+    - name: Building Package
+      run: |
+        python -m venv env
+        source env/bin/activate
+        pip install maturin
+        pip install pytest pytest-cov 
+        cd pyparaspace
+        maturin develop
+    - name: Testing the code
+      run: |
+        source env/bin/activate
+        pytest pyparaspace/testPyParaspace.py --cov
