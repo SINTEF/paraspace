@@ -4,10 +4,6 @@ from unified_planning.test.examples.realistic import get_example_problems as rea
 from unified_planning.test.examples.minimals import get_example_problems as minimal_examples
 from unified_planning.engines.results import ValidationResultStatus
 
-
-from engine import MySolverImpl
-
-
 def test_example(example):
     print(example.problem)
     planner = OneshotPlanner(name="paraspace")
