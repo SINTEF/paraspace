@@ -4,7 +4,7 @@ from unified_planning.test.examples.realistic import get_example_problems as rea
 from unified_planning.test.examples.minimals import get_example_problems as minimal_examples
 from unified_planning.engines.results import ValidationResultStatus
 
-def test_example(example):
+def run_example(example):
     print(example.problem)
     planner = OneshotPlanner(name="paraspace")
     result = planner.solve(example.problem)
@@ -29,7 +29,7 @@ results = []
 for name, example in examples.items():
     ok = False
     try:
-        ok = test_example(example)
+        ok = run_example(example)
         assert not ok
         results.append((name,ok,None))
     except Exception as e:
