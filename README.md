@@ -1,8 +1,7 @@
 # ParaSpace timelines planner
 
-A simple, flexible and extensible solver for timeline-based planning problems using [Z3 Theorem Prover](https://github.com/Z3Prover/z3) and a novel abstraction refinement algorithm. The method used for the solver is described in this [paper](https://www.sciencedirect.com/science/article/pii/S2405896322024764). 
-% why this solver?
-The aim of the solver is to better solve scheduling-heavy problems. 
+Paraspace is a simple, flexible and extensible solver for timeline-based planning problems using [Z3 Theorem Prover](https://github.com/Z3Prover/z3) and a novel abstraction refinement algorithm. 
+The method used for the solver is described in this [paper](https://www.sciencedirect.com/science/article/pii/S2405896322024764). 
 
 # Installation
 
@@ -98,7 +97,7 @@ print(result)
 ```
 
 # Short API Documentation
-A short API documentation of the most essential dataypes and function of the paraspace software is given in [Documentation](docs/Documentation.md) file.
+A short API documentation of the most essential dataypes and functions of the paraspace software is described in [DOCUMENTATION](docs/DOCUMENTATION.md) file.
 
 # Licence
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
