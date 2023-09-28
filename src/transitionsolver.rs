@@ -1,7 +1,7 @@
 use crate::{
     problem::{
-        self, Problem, Solution, SolutionTimeline, SolutionToken, TemporalRelationship, TokenTime,
-        TokenType,
+        self, Problem, Solution, SolutionCondition, SolutionTimeline, SolutionToken,
+        TemporalRelationship, TokenTime, TokenType,
     },
     // transitionrelation::{transitionrelation, TransitionRelation},
     z3real_value,
@@ -52,6 +52,7 @@ struct Condition<'a, 'z3> {
     cond_spec: &'a problem::Condition,
     token_queue: usize,
     alternatives_extension: Option<Bool<'z3>>,
+    target_chosen: Vec<(usize, Option<Bool<'z3>>)>,
 }
 
 struct Timeline<'z> {
@@ -86,7 +87,7 @@ pub fn solve(problem: &Problem, settings: &SolverSettings) -> Result<Solution, S
         })
         .collect::<Vec<_>>();
 
-    let mut timeline_names = problem
+    let timeline_names = problem
         .timelines
         .iter()
         .map(|t| t.name.as_str())
@@ -108,7 +109,7 @@ pub fn solve(problem: &Problem, settings: &SolverSettings) -> Result<Solution, S
 
     let mut resource_constraints: HashMap<usize, ResourceConstraint> = Default::default(); // token to resourceconstraint
 
-    let mut timelines_by_name = problem
+    let timelines_by_name = problem
         .timelines
         .iter()
         .enumerate()
@@ -191,6 +192,7 @@ pub fn solve(problem: &Problem, settings: &SolverSettings) -> Result<Solution, S
                             cond_spec,
                             alternatives_extension: None,
                             active,
+                            target_chosen: Vec::new(),
                         });
                     }
 
@@ -534,6 +536,7 @@ pub fn solve(problem: &Problem, settings: &SolverSettings) -> Result<Solution, S
                             cond_spec,
                             alternatives_extension: None,
                             active,
+                            target_chosen: Vec::new(),
                         });
                     }
 
@@ -862,6 +865,8 @@ pub fn solve(problem: &Problem, settings: &SolverSettings) -> Result<Solution, S
                         if let Some(choose_link) = choose_link.as_ref() {
                             alternatives.push(choose_link.clone());
                         }
+
+                        conds[cond_idx].target_chosen.push((token_idx, choose_link));
                     }
 
                     // println!(
@@ -1268,10 +1273,45 @@ pub fn solve(problem: &Problem, settings: &SolverSettings) -> Result<Solution, S
 
                     // println!("value {:?}", v.value);
 
+                    let mut solution_conditions = Vec::new();
+                    for cond in v.conditions.iter() {
+                        let cond = &conds[*cond];
+                        let cond_active = cond
+                            .active
+                            .as_ref()
+                            .map(|a| model.eval(a, true).unwrap().as_bool().unwrap())
+                            .unwrap_or(true);
+
+                        if !cond_active {
+                            continue;
+                        }
+
+                        for (target_token_idx, value) in cond.target_chosen.iter() {
+                            let active = value
+                                .as_ref()
+                                .map(|a| model.eval(a, true).unwrap().as_bool().unwrap())
+                                .unwrap_or(true);
+
+                            if !active {
+                                continue;
+                            }
+
+                            let state = &states[tokens[*target_token_idx].state];
+                            let other_timeline = &timeline_names[state.timeline];
+                            let other_token_seq = state.state_seq;
+
+                            solution_conditions.push(SolutionCondition {
+                                timeline: other_timeline.to_string(),
+                                token_idx: other_token_seq,
+                            });
+                        }
+                    }
+
                     timelines[tl_idx].tokens.push(SolutionToken {
                         value: v.value.to_string(),
                         start_time,
                         end_time,
+                        conditions: solution_conditions,
                     })
                 }
 

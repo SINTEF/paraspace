@@ -93,4 +93,12 @@ pub struct SolutionToken {
     pub value: String,
     pub start_time: f32,
     pub end_time: f32,
+    pub conditions :Vec<SolutionCondition>,
 }
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct SolutionCondition {
+    pub timeline :String,
+    pub token_idx :usize,
+}
+

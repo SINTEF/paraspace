@@ -365,6 +365,17 @@ pub struct SolutionTokenPy {
     pub start_time: f32,
     #[pyo3(get)]
     pub end_time: f32,
+    #[pyo3(get)]
+    pub conditions: Vec<SolutionConditionPy>,
+}
+
+#[pyclass(name = "SolutionCondition")]
+#[derive(Clone)]
+pub struct SolutionConditionPy {
+    #[pyo3(get)]
+    pub timeline: String,
+    #[pyo3(get)]
+    pub token_idx: usize,
 }
 
 #[pymethods]
@@ -401,19 +412,25 @@ impl SolutionTimelinePy {
 impl SolutionTokenPy {
     fn __repr__(&self) -> String {
         format!(
-            "SolutionToken(value: {}, start_time: {}, end_time: {})",
-            self.value, self.start_time, self.end_time
+            "SolutionToken(value: {}, start_time: {}, end_time: {}, conditions: {:?})",
+            self.value,
+            self.start_time,
+            self.end_time,
+            self.conditions
+                .iter()
+                .map(|c| (&c.timeline, c.token_idx))
+                .collect::<Vec<_>>(),
         )
     }
 }
 
 #[pyfunction]
-fn as_json(problem :ProblemArgument) -> PyResult<String> {
+fn as_json(problem: ProblemArgument) -> PyResult<String> {
     let problem = convert_problem_arguments(problem);
     Ok(paraspace::to_json(&problem))
 }
 
-fn convert_problem_arguments(problem :ProblemArgument) -> Problem {
+fn convert_problem_arguments(problem: ProblemArgument) -> Problem {
     match problem {
         ProblemArgument::ProblemPy(p) => convert_problem(p),
         ProblemArgument::TimelinesList(l) => Problem {
@@ -464,6 +481,14 @@ fn solve(problem: ProblemArgument) -> PyResult<SolutionPy> {
                             value: t.value,
                             start_time: t.start_time,
                             end_time: t.end_time,
+                            conditions: t
+                                .conditions
+                                .into_iter()
+                                .map(|c| SolutionConditionPy {
+                                    timeline: c.timeline,
+                                    token_idx: c.token_idx,
+                                })
+                                .collect(),
                         })
                         .collect(),
                 })
@@ -583,4 +608,3 @@ fn convert_conditions(cond: Vec<Vec<TemporalCondPy>>) -> Vec<Vec<Condition>> {
         })
         .collect()
 }
-
