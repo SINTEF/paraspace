@@ -1,6 +1,6 @@
 [package]
 name = "pyparaspace"
-version = "0.1.5"
+version = "0.1.6"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
@@ -11,4 +11,4 @@ crate-type = ["cdylib"]
 [dependencies]
 pyo3 = { version = "0.18", features = ["indexmap"] }
 indexmap = "1.6"
-paraspace = { path = "..", features = ["static-link-z3"] }
+paraspace = { path = "lib/paraspace", features = ["static-link-z3"] }
