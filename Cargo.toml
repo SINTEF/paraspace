@@ -16,3 +16,4 @@ z3 = { version = "0.11.2", features = []}
 structopt = { version = "0.3", default-features = false }
 hprof = "0.1"
 ordered-float = "3.7"
+log = "0.4.20"
