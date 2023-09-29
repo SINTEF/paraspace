@@ -47,6 +47,23 @@ Windows and Manylinux platforms are currently supported.
 If building and installing the local package works, then using `maturin build --release` 
 should also correctly build a wheel package, which can be uploaded to PyPi using `maturin publish`.
 
+Because the z3-rs feature "static-link-z3" is used, the Z3 library is built
+during the building of paraspace. To make sure that C++ compiler paths are
+correctly set up, use the "x64 Native Tools Command Prompt" that is installed
+by Visual Studio. If you get compilation errors after trying to build in a
+different environment, the z3-rs package doesn't always correctly rebuild the
+right parts, so it might be necessary to explicitly clean the build cache
+(cargo clean or git clean).
+
+Note that building paraspace with the statically linked Z3 can take some time,
+typically 10-20 minutes.
+
+When in the correct environment, publishing a new release should be possible with:
+
+```
+maturin publish --skip-existing
+```
+
 ## Manylinux
 
 `paraspace` requires an Rust version 1.60 and Clang version 3.5 (to compile the Z3 solver), 
