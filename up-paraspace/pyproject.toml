@@ -22,7 +22,7 @@ classifiers = [
   "Programming Language :: Python :: Implementation :: PyPy",
 ]
 dependencies = [
-  "pyparaspace==0.1.5",
+  "pyparaspace==0.1.6",
   "unified-planning~=1.0",
   "up-pyperplan~=1.0"
 ]

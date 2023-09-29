@@ -2,4 +2,4 @@
 #
 # SPDX-License-Identifier: MIT
 
-from .up_paraspace import ParaSpacePlanner
+from .up_paraspace import ParaspacePlanner

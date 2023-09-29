@@ -1,0 +1,3 @@
+
+class ParaspaceTimelinesPlannerConversionError(Exception):
+    pass
