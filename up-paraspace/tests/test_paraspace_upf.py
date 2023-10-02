@@ -3,6 +3,8 @@ from unified_planning.shortcuts import *
 from unified_planning.test.examples.realistic import get_example_problems as realistic_examples
 from unified_planning.test.examples.minimals import get_example_problems as minimal_examples
 from unified_planning.engines.results import ValidationResultStatus
+from up_paraspace import *
+import time
 
 def run_example(example):
     print(example.problem)
@@ -39,5 +41,21 @@ def test_upf():
     for name,ok,err in results:
         print(name,ok,err)
 
+def test_ceramic_tms():
+    for n_kilns, n_pieces in [(1, 2), (2, 4), (2, 6), (4, 6), (1, 10), (5, 10), (2, 16), (3, 16)]:
+        problem = mk_tms_timeline(n_kilns, n_pieces)
+        print(problem)
+
+        t0 = time.time()
+        with OneshotPlanner(name="paraspace", problem_kind=problem.kind) as planner:
+            result = planner.solve(problem)
+            print("%s returned: %s" % (planner.name, result.plan))
+
+        t1 = time.time()
+        print(f"Solved n_kilns={n_kilns} n_pieces={n_pieces} in {t1-t0:.2f} seconds")
+        print(f"{n_kilns} & {n_pieces} & {1000.0*(t1-t0):.2f} \\\\")
+        
+
 if __name__=="__main__":
     test_upf()
+    test_ceramic_tms()
