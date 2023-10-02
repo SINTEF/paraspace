@@ -53,7 +53,6 @@ def test_ceramic_tms():
 
         t1 = time.time()
         print(f"Solved n_kilns={n_kilns} n_pieces={n_pieces} in {t1-t0:.2f} seconds")
-        print(f"{n_kilns} & {n_pieces} & {1000.0*(t1-t0):.2f} \\\\")
         
 
 if __name__=="__main__":
