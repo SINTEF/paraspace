@@ -68,8 +68,8 @@ class ParaspacePlanner(engines.Engine, engines.mixins.OneshotPlannerMixin):
         env = problem.environment
 
         problem = self._compile(problem)
-        if not self.supports(problem.kind):
-            raise Exception("Problemkind not supported" + str(problem.kind))
+        # if not self.supports(problem.kind):
+        #     raise Exception("Problemkind not supported" + str(problem.kind))
         
         problem_converters = [
             ParaspaceClassicalProblemConversion,
@@ -80,7 +80,13 @@ class ParaspacePlanner(engines.Engine, engines.mixins.OneshotPlannerMixin):
             try:
                 conv = conv_class(problem, self.compiler_res)
                 plan = conv.convert_and_solve(problem)
-                return plan
+
+                status = (
+                    PlanGenerationResultStatus.UNSOLVABLE_INCOMPLETELY
+                    if plan is None
+                    else PlanGenerationResultStatus.SOLVED_SATISFICING
+                )
+                return up.engines.PlanGenerationResult(status, plan, self.name)
             except ParaspaceTimelinesPlannerConversionError as e:
                 pass
         

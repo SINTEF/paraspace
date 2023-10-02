@@ -500,15 +500,7 @@ class ParaspaceTimelinesProblemConversion:
     def convert_and_solve(self, problem: "up.model.Problem"):
         stage1 = convert_stage1(problem)
         paraspace_problem = convert_stage2(stage1)
-
-        print(paraspace.as_json(paraspace_problem))
-
         solution = paraspace.solve(paraspace_problem)
-
         plan = self._decompile(stage1, solution)
-        status = (
-            PlanGenerationResultStatus.UNSOLVABLE_INCOMPLETELY
-            if plan is None
-            else PlanGenerationResultStatus.SOLVED_SATISFICING
-        )
-        return up.engines.PlanGenerationResult(status, plan, self.name)
+        return plan
+        
