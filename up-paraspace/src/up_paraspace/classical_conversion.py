@@ -7,7 +7,7 @@ import pyparaspace as pps
 from collections import defaultdict
 import itertools
 from fractions import Fraction
-
+from .conversion_error import ParaspaceTimelinesPlannerConversionError
 
 def type_name(t):
     if t.is_bool_type():
@@ -15,7 +15,7 @@ def type_name(t):
     elif t.is_user_type():
         return t.name
     else:
-        raise "unsupported type"
+        raise ParaspaceTimelinesPlannerConversionError("unsupported type")
 
 
 class ParaspaceClassicalProblemConversion:
@@ -91,9 +91,9 @@ class ParaspaceClassicalProblemConversion:
             ):
                 dur_lower = init_value.int_constant_value()
             else:
-                raise Exception("Not supported duration fluent", action.duration)
+                raise ParaspaceTimelinesPlannerConversionError("Not supported duration fluent", action.duration)
         else:
-            raise Exception("Not supported duration type", action.duration)
+            raise ParaspaceTimelinesPlannerConversionError("Not supported duration type", action.duration)
         dur_upper = 0
         if action.duration.upper.is_int_constant():
             dur_upper = action.duration.upper.int_constant_value()
@@ -105,11 +105,11 @@ class ParaspaceClassicalProblemConversion:
             ):
                 dur_upper = init_value.int_constant_value()
             else:
-                raise Exception("Not supported duration fluent", action.duration)
+                raise ParaspaceTimelinesPlannerConversionError("Not supported duration fluent", action.duration)
         else:
-            raise Exception("Not supported duration type", action.duration)
+            raise ParaspaceTimelinesPlannerConversionError("Not supported duration type", action.duration)
         if dur_lower < 1 and dur_upper < 1:
-            raise Exception("Do only support actions with duration longer than one")
+            raise ParaspaceTimelinesPlannerConversionError("Do only support actions with duration longer than one")
         return (dur_lower, dur_upper)
 
     def _decode_fnode(self, fnode, domains):
@@ -117,7 +117,7 @@ class ParaspaceClassicalProblemConversion:
             if fnode.is_equals():
                 args = list(fnode.args)
                 if len(args) != 2:
-                    raise "Not supported Equal expression without 2 arguments"
+                    raise ParaspaceTimelinesPlannerConversionError("Not supported Equal expression without 2 arguments")
                 timeline = str(args[0])
                 value = str(args[1])
                 fluent_type = str(args[0].fluent().type)
@@ -128,12 +128,12 @@ class ParaspaceClassicalProblemConversion:
                     fluent_type = str(fnode.fluent().type)
                     return [(timeline, "true", fluent_type)]
                 else:
-                    raise "Not supported type" + str(fnode.node_type) + str(
+                    raise ParaspaceTimelinesPlannerConversionError("Not supported type" + str(fnode.node_type) + str(
                         fnode.fluent().name
-                    )
+                    ))
             elif fnode.is_not():
                 if len(fnode.args) > 1:
-                    raise "Only supports one exp inside NOT exp"
+                    raise ParaspaceTimelinesPlannerConversionError("Only supports one exp inside NOT exp")
                 for arg in fnode.args:
                     [(timeline, value, fluent_type)] = self._decode_fnode(arg, domains)
                     nodes = []
@@ -142,11 +142,11 @@ class ParaspaceClassicalProblemConversion:
                             nodes.append((timeline, v, fluent_type))
                     return nodes
             else:
-                raise Exception(
+                raise ParaspaceTimelinesPlannerConversionError(
                     "Not supported precondition operator kind" + str(fnode.node_type)
                 )
         else:
-            raise Exception("Not supported precondtion type" + str(fnode.type))
+            raise ParaspaceTimelinesPlannerConversionError("Not supported precondtion type" + str(fnode.type))
         return None
 
     def convert_and_solve(self, problem: "up.model.Problem"):
@@ -179,7 +179,7 @@ class ParaspaceClassicalProblemConversion:
                 self.return_time_triggered_plan = True
                 duration = self._decode_duration(action, problem)
                 if action.simulated_effects != {}:
-                    raise Exception("Do not support simulated effects")
+                    raise ParaspaceTimelinesPlannerConversionError("Do not support simulated effects")
                 for timing, conds in action.conditions.items():
                     if str(timing.lower) == str(timing.upper) == "start":
                         for pre in conds:
@@ -201,7 +201,7 @@ class ParaspaceClassicalProblemConversion:
                             if len(or_conds) > 0:
                                 conditions.append(pps.OrCond(or_conds))
                     else:
-                        raise Exception("Not supported timing kind", timing)
+                        raise ParaspaceTimelinesPlannerConversionError("Not supported timing kind", timing)
                 effs_from_start = []
                 effs_from_end = []
                 for timing, effs in action.effects.items():
@@ -211,7 +211,7 @@ class ParaspaceClassicalProblemConversion:
                         has_wAiT_action = True
                         effs_from_end += effs
                     else:
-                        raise Exception("Not supported Timing kind", timing)
+                        raise ParaspaceTimelinesPlannerConversionError("Not supported Timing kind", timing)
                 for eff in effs_from_start:
                     if eff.is_assignment():
                         timeline = str(eff.fluent)
@@ -235,7 +235,7 @@ class ParaspaceClassicalProblemConversion:
                             }
                         )
                     else:
-                        raise "Effect kind not supported" + str(eff.kind)
+                        raise ParaspaceTimelinesPlannerConversionError("Effect kind not supported" + str(eff.kind))
                 for eff in effs_from_end:
                     if eff.is_assignment():
                         timeline = str(eff.fluent)
@@ -312,7 +312,7 @@ class ParaspaceClassicalProblemConversion:
                             }
                         )
                     else:
-                        raise "Effect kind not supported" + str(eff.kind)
+                        raise ParaspaceTimelinesPlannerConversionError("Effect kind not supported" + str(eff.kind))
                 action_values.append(
                     pps.TokenType(
                         value=action.name,
@@ -353,7 +353,7 @@ class ParaspaceClassicalProblemConversion:
                     elif arg.is_object_exp():
                         value = arg.object().name
                     else:
-                        raise "Not yet supported arguments type" + str(arg.node_type)
+                        raise ParaspaceTimelinesPlannerConversionError("Not yet supported arguments type" + str(arg.node_type))
                 static_tokens[timeline].append(
                     pps.StaticToken(
                         value=value, const_time=pps.goal(), capacity=0, conditions=[]
@@ -372,7 +372,7 @@ class ParaspaceClassicalProblemConversion:
                     )
                 )
             else:
-                raise Exception(f"Not supported goal type" + str(goal.node_type))
+                raise ParaspaceTimelinesPlannerConversionError(f"Not supported goal type" + str(goal.node_type))
 
         # Sort out the frame_axioms
         frame_cond_dict = {}
@@ -411,7 +411,7 @@ class ParaspaceClassicalProblemConversion:
                 if str(fluent.type) in domains.keys():
                     values = domains[str(fluent.type)]
                 else:
-                    raise "TODO: Continous-time fluent types is not supported -> resources"
+                    raise ParaspaceTimelinesPlannerConversionError("TODO: Continous-time fluent types is not supported -> resources")
 
                 # Ground fluents
                 if len(fluent.signature) != 0:

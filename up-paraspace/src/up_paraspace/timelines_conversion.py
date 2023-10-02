@@ -8,6 +8,7 @@ from dataclasses import dataclass
 
 from .conversion_error import ParaspaceTimelinesPlannerConversionError
 
+
 @dataclass
 class ConvActionMap:
     resources: List[str]
@@ -453,6 +454,7 @@ def convert_stage2(problem: Stage1) -> paraspace.Problem:
 
         timelines.append(paraspace.Timeline(name=tl_name, token_types=token_types, static_tokens=static_tokens))
     return paraspace.Problem(timelines=timelines)
+
 
 class ParaspaceTimelinesProblemConversion:
     def __init__(self, problem, compiler_res):
