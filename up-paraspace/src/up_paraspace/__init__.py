@@ -3,3 +3,4 @@
 # SPDX-License-Identifier: MIT
 
 from .up_paraspace import ParaspacePlanner
+from .tms_example import tms_example_problems, mk_tms_timeline
