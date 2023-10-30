@@ -27,7 +27,7 @@ class ConvValue:
 
 @dataclass
 class ConvTL:
-    initial_value: str | None
+    initial_values :List[Tuple[int,str]]
     goal: str | None
     valid_transitions: Set[Tuple[str, str]]
     values: List[ConvValue]
@@ -84,7 +84,7 @@ def convert_stage1(problem: Problem) -> Stage1:
                 resources[fluent_str(ground_fluent)] = ConvResource(None, [])
             else:
                 timelines[fluent_str(ground_fluent)] = ConvTL(
-                    initial_value=None,
+                    initial_values=[],
                     goal=None,
                     valid_transitions=set(),
                     values=[
@@ -110,9 +110,11 @@ def convert_stage1(problem: Problem) -> Stage1:
             resources[var_name].initial_value = 0
 
         elif var_name in timelines:
+            tl = timelines[var_name]
             if not rhs.is_object_exp():
                 raise ParaspaceTimelinesPlannerConversionError("Initial value of timeline fluent must be an object.")
-            timelines[var_name].initial_value = str(rhs.object())
+            tl.initial_values = [(t,v) for t,v in tl.initial_values if t != 0]
+            tl.initial_values.append((0,str(rhs.object())))
 
     for lifted_fluent, value in problem.fluents_defaults.items():
         for ground_fluent in do_ground_fluent(lifted_fluent, findomains):
@@ -121,8 +123,30 @@ def convert_stage1(problem: Problem) -> Stage1:
     if len(problem.initial_defaults) > 0:
         raise ParaspaceTimelinesPlannerConversionError("Initial default values are not supported.")
 
+    if len(problem.timed_goals) > 0:
+        raise ParaspaceTimelinesPlannerConversionError("Timed goals values are not supported.")
+
+
     for lhs, value in problem.initial_values.items():
         set_initial_value(lhs.fluent(), value)
+
+
+    for timing,effs in problem.timed_effects.items():
+        if not (timing.is_global() and timing.is_from_start()):
+            raise ParaspaceTimelinesPlannerConversionError("Timed effects must be relative to global start time.")
+        
+        for eff in effs:
+            if not eff.is_assignment():
+                raise ParaspaceTimelinesPlannerConversionError("Timed effects must be simple assignments.")
+
+            fluent = fluent_str(eff.fluent)
+            value = str(eff.value)
+
+            if not fluent in timelines:
+                raise ParaspaceTimelinesPlannerConversionError("Timed effects must apply only to timeline fluents.")
+            
+            if not any((t == timing.delay for t,_ in timelines[fluent].initial_values)):
+                timelines[fluent].initial_values.append((timing.delay, value ))
 
     for goal in problem.goals:
         if not goal.is_equals():
@@ -345,6 +369,9 @@ def convert_stage1(problem: Problem) -> Stage1:
     # print("RESOURCES", resources)
     # print("TIMELINES", timelines)
 
+    for timeline in timelines.values():
+        timeline.initial_values.sort(key=lambda x: x[0])
+
     return Stage1(timelines, resources)
 
 
@@ -356,11 +383,12 @@ def convert_stage2(problem: Stage1) -> paraspace.Problem:
         token_types = []
         static_tokens = []
 
-        if timeline.initial_value is not None:
+        for idx,(this_time,val) in enumerate(timeline.initial_values):
+            next_time = timeline.initial_values[idx+1][0] if idx+1 < len(timeline.initial_values) else None
             static_tokens.append(
                 paraspace.StaticToken(
-                    value=timeline.initial_value,
-                    const_time=paraspace.fact(0, None),
+                    value=val,
+                    const_time=paraspace.fact(this_time, next_time),
                     capacity=0,
                     conditions=[],
                 )

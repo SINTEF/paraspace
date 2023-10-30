@@ -72,8 +72,8 @@ class ParaspacePlanner(engines.Engine, engines.mixins.OneshotPlannerMixin):
         #     raise Exception("Problemkind not supported" + str(problem.kind))
         
         problem_converters = [
+            ParaspaceTimelinesProblemConversion,
             ParaspaceClassicalProblemConversion,
-            ParaspaceTimelinesProblemConversion
         ]
 
         for conv_class in problem_converters:
@@ -90,7 +90,7 @@ class ParaspacePlanner(engines.Engine, engines.mixins.OneshotPlannerMixin):
             except ParaspaceTimelinesPlannerConversionError as e:
                 pass
         
-        raise ParaspaceTimelinesProblemConversion("No converters succeeded in translating the problem to paraspace.")
+        raise ParaspaceTimelinesPlannerConversionError("No converters succeeded in translating the problem to paraspace.")
     
 env = up.environment.get_environment()
 env.factory.add_engine('paraspace', __name__, 'ParaspacePlanner')
