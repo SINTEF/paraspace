@@ -7,7 +7,7 @@ use crate::{
     z3real_value,
     SolverError,
 };
-use log::{debug, trace, warn, info};
+use log::{debug, info, trace, warn};
 use std::collections::{HashMap, HashSet};
 use z3::ast::{Ast, Bool, Real};
 
@@ -586,17 +586,17 @@ pub fn solve(problem: &Problem, settings: &SolverSettings) -> Result<Solution, S
                         }
 
                         let mut any_const = false;
-                        let mut n_lits = 0;
                         for m in matching_states {
                             if let Some(l) = m {
                                 clause.push(l.clone());
-                                n_lits += 1;
                             } else {
                                 any_const = true;
                             }
                         }
 
-                        assert!(any_const == (n_lits == 0));
+                        // If we are evaluating an alternative condition, there might not be any
+                        // way to satisfy it, so n_lits can be zero. The resulting clause below
+                        // then disables this alternative.
 
                         if !any_const {
                             let clause_refs = clause.iter().collect::<Vec<_>>();
@@ -835,7 +835,8 @@ pub fn solve(problem: &Problem, settings: &SolverSettings) -> Result<Solution, S
 
                         trace!(
                             "TEMPORAL {:?} {:?}",
-                            conds[cond_idx].cond_spec, temporal_rel
+                            conds[cond_idx].cond_spec,
+                            temporal_rel
                         );
 
                         if conds[cond_idx].cond_spec.amount > 0 {
@@ -1079,7 +1080,11 @@ pub fn solve(problem: &Problem, settings: &SolverSettings) -> Result<Solution, S
             .collect::<HashMap<_, _>>();
 
         for (i, timeline) in timelines.iter().enumerate() {
-            debug!("Timeline {} has {} states", timeline_names[i], timeline.states.len());
+            debug!(
+                "Timeline {} has {} states",
+                timeline_names[i],
+                timeline.states.len()
+            );
         }
 
         info!(
@@ -1636,7 +1641,8 @@ fn distance_to(
 ) -> Option<usize> {
     trace!(
         "Finding distance from {:?} to  {:?}",
-        start_values, goal_value
+        start_values,
+        goal_value
     );
     let mut visited_values = HashSet::new();
     let mut current_values = start_values.iter().copied().collect::<HashSet<_>>();
