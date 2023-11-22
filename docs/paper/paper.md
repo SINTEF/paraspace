@@ -14,63 +14,68 @@ authors:
     equal-contrib: true 
     affiliation: 1
   - name: Synne Fossøy
-    orcid: 0000-0000-0000-0000
+    orcid: 0000-0003-4139-5486
     equal-contrib: true 
     affiliation: 1
 affiliations:
  - name: SINTEF Digital, Norway
    index: 1
-date: 30 September 2023
+date: 30 November 2023
 bibliography: paper.bib
 
 ---
 # Summary
 
-In a wide variety of resarch fields such as autonomous operations and inspections in robotics, warehouse logistics and collecting data for 
-natural sciences, there is a need to choose which high-level tasks to do and when, in order to obtain the system's objectives automously.
-This field of research is called AI planning, which research how to solve these planning and scheduling problems.
-A planning problem consist of an initial state, a desired goal state and a selection of 
-available actions. For instance for a simple movable robot, the inital state and goal may be two different locations, while
-possible actions maybe moving between sets of two locations.
-The `paraspace` software is to solve time-based planning problems, meaning that states and actions have duration in time and the goals 
-may include time deadlines. The software uses an novel algorithm  to find a solution with advantages on selected problems.
-The purpose of the software is to make its capabilities available for not only for AI planning resarchers developing the field of planning,
-but also for resarches in need of (task/AI) planning in diverse fields such as autonoums robotics, manufactoring, agriculture and biology.
+In a wide variety of research fields such as autonomous operations and inspections in robotics, drones in search and rescue, warehouse logistics
+and collecting data for natural sciences, it's needed to plan high-level tasks for the robots/systems to behave autonomously.   
+High-level tasks may for instance be moving between locations, handling and lifting objects, or more complex tasks such as searching for an object.  
+This field of research is called automated planning, which researches how to solve these planning and scheduling problems and how to execute computed plans.
+A classical planning problem consists of an initial state, a desired goal state, and a selection of available actions. 
+For instance, for a simple movable robot, the initial state and goal may be two different locations, while
+possible actions may be moving between locations.
+The `paraspace` software solves time-based planning problems, meaning that states and actions have duration in time and the goals 
+may include time deadlines. The software uses a novel algorithm to find a solution advantageous for selected problems. 
+The software is both available as a stand-alone software package and as a part of the Unified Planning Framework (UPF) [@upf].
+The purpose of the software is to make its capabilities available not only for AI planning researchers developing the field of planning,
+but also for researchers in need of (task/AI) planning in diverse fields such as autonomous robotics, manufacturing, agriculture, and biology.
   
 # Statement of need
 
-`paraspace` is a software for planning of temporal problems, meaning it considers time as part of the problem.
-The most used (classical) planners [@ghallab1998pddl] uses a synchrounous time representation, while `paraspace`
-uses an asynchrountious one, so called timeline-based. The most common way to make a planner based on timelines, is to build a 
-costum constraint solver and integrate it with a selected search algorithm.  There exists a several other planner softwares based on this concept, 
-such as oRatio [@de2020lifted], FAPE[@FAPE] and Europa [@barreiro2012europa], however these planner softwares have large code bases 
+`paraspace` is software for planning temporal problems, meaning it considers time as part of the problem.
+The most used (classical) planners [@ghallab1998pddl] use a synchronous time representation where the whole state space is equally discretized in time. 
+On the other hand,  `paraspace` uses an asynchronous one, where the state space is discretized differently for each variable.
+This is called timeline-based planning. The most common way to make a planner based on timelines is to build a 
+custom constraint solver and integrate it with a selected search algorithm.  There exist several other planner software based on this concept, 
+such as oRatio [@de2020lifted], FAPE[@FAPE], and Europa [@barreiro2012europa], however, these planner software have large code bases 
 (12k-100k lines of code). There exist simpler implementations of planners, like LCP [@bit2018constraint] and ANML SMT [@valentini2020temporal] 
-using off-the-shelf constraint solvers in contrast to costum ones such as the Z3 SMT solvers [@z3]. `paraspace` uses also the Z3 SMT solver 
-combined with a novel algorithm ensuring that the search space for a solution not gets unnecarissly large. 
-Using an off-the-shelf solver makes the planner software simpler, more flexible and easier to extend. 
+using off-the-shelf constraint solvers in contrast to custom ones such as the Z3 SMT solvers [@z3].
+Using an off-the-shelf solver makes the planner software simpler, more flexible, and easier to extend. `paraspace` uses also the Z3 SMT solver 
+combined with a novel algorithm ensuring that the search space for a solution does not get unnecessarily large. 
 
 The design of our planner opens for better performance for several planning problems such as scheduling-heavy problems. 
-By scehduling-heavy it is meant problems where the timing between variables are essential. For instance an underwater multi-robot system 
-with a set of given inspection points with time deadlines, meaning the inspection points needs to be inspected before the deadlines. 
-The required planning between robots are minimal(yet needed).
-Such a problem can be relevant for instance inspection and maintainance of equipment under water for aquaculture applications 
-or collecting data for a resarch project researching life under water. A version of this problem is used in the tutorial of the software.  
+Scheduling-heavy problems are problems where the timing between variables is essential. For instance an underwater multi-robot system 
+with a set of given inspection points with time deadlines, meaning the inspection points need to be inspected before the deadlines. 
+The required planning between robots is minimal, yet needed.
+Such a problem can be relevant for instance inspection and maintenance of equipment underwater for aquaculture applications 
+or collecting data for a research project researching life under water. A version of this problem is used in the tutorial of the software.  
 
-The planner software itself is provided in the programmering language Rust, however as part of the software there is a python API 
-for easier use. The software is available on the PyPi-platform.  
+The planner software itself is provided in the programming language Rust, however, it is equipped with a Python API 
+for easier use. The software is available on the PyPi platform.  
 Further, the planner is also integrated into the Unified Planning Framework UPF [@upf], 
-which is a python package with the goal of making planners and other planning technology easier to acess and use by minimizing the efforts to 
-switch between planners and other planning technology. The integration into UPF doesn't only offer an api into the useful framework, it also include
-software for converting more classical problems into timelines problems. This convertion can be useful by other AI planning researches in the pursuit 
-of bridging timelines and classical problems, either theoretically or for own planner implementations. 
+which is a Python-based framework for AI planning.
+The objectives of UPF are to make planners and other planning technology easily accessible by minimizing the efforts needed
+to get started with planning for beginners and to switch between planners and other planning technologies for more experienced users.
+The integration into UPF does not only offer an API into the useful framework, but it also includes 
+software for converting more classical problems into timelines problems. This conversion can be useful by other AI planning researchers in the pursuit 
+of bridging timelines and classical problems, either theoretically or for their planner implementations. 
 
-The software have been used as part of an underwater robotics use-case, with scientific article published here [@LUTEBERGET2022].
-It have been used in an on-going research project on inspection and maintance robotics [@robplan] and integrated as a feature to the Unified Planning Framework developed 
+The software has been used as part of an underwater robotics use case, with a scientific article published here [@LUTEBERGET2022].
+It has been used in an ongoing research project on inspection and maintenance robotics [@robplan] and integrated as a feature of the Unified Planning Framework developed 
 by the EU project AIPLAN4EU [@aiplan4eu].
 
 # Acknowledgements
 
 We acknowledge financial support from the research project ROBPLAN [@robplan] funded by the Norwegian Research Council (RCN), grant number 322744
-and the EU H2020 project AIPLAN4EU [@aiplan4eu], grant number 101016442, in order to develop this software. 
+and the EU H2020 project AIPLAN4EU [@aiplan4eu], grant number 101016442, to develop this software. 
 
 # References

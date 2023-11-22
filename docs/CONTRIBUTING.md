@@ -1,5 +1,3 @@
-# Contribution Guidelines
-
 Thank you for considering contributing to our project! We appreciate your interest and support. By contributing, you can help us improve the project and make it better for everyone. Please take a moment to review these guidelines before getting started.
 
 ## How Can You Contribute?
@@ -16,14 +14,14 @@ There are several ways you can contribute to this project:
 
 1. **Fork the Repository:** Click the "Fork" button on the top right of this repository. This creates a copy of the project in your GitHub account.
 2. **Clone Your Fork:** Clone your forked repository to your local machine using `git clone`.
-3. **Create a new branch:** Create a new brach for your work. Choose a descriptive name that reflects the purpose of your changes
-4. **Make your changes:** Make your changes and improvements locally and push to your fork.
+3. **Create a new branch:** Create a new branch for your work. Choose a descriptive name that reflects the purpose of your changes
+4. **Make your changes:** Make your changes and improvements locally and push them to your fork.
 5. **Open a Pull Request:** Open a pull request to the paraspace repo with a description of the purpose of your suggested changes.
-6. **Review and Merge:** Participate in eventual discussions of the pull request and adress any comments from maintainers. Once your changes are approved a project maintainer will merge you pull request into the main branch.
+6. **Review and Merge:** Participate in eventual discussions of the pull request and address any comments from maintainers. Once your changes are approved a project maintainer will merge your pull request into the main branch.
 
 ## Guidelines for Participation
-When contributing either through issues or pull requests, we encourage you to describe the discovered bug, the suggested code alterations and new code as thorughly as possible.
-For bugs, espeically, please include error messages, logs and example code to recreate the error.
+When contributing either through issues or pull requests, we encourage you to describe the discovered bug, the suggested code alterations, and the new code as thoroughly as possible.
+For bugs, especially, please include error messages, logs, and example code to recreate the error.
 
 ## License
-By contributing to this project, you agree that your contributions will be licened under the project's licence (See LICENCE file)
+By contributing to this project, you agree that your contributions will be licensed under the project's license (See LICENCE file)
