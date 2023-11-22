@@ -26,18 +26,20 @@ bibliography: paper.bib
 ---
 # Summary
 
-In a wide variety of research fields such as autonomous operations and inspections in robotics, drones in search and rescue, warehouse logistics
-and collecting data for natural sciences, it's needed to plan high-level tasks for the robots/systems to behave autonomously.   
-High-level tasks may for instance be moving between locations, handling and lifting objects, or more complex tasks such as searching for an object.  
-This field of research is called automated planning, which researches how to solve these planning and scheduling problems and how to execute computed plans.
+Autonomous robots (ie.., unmanned vehicles and robot manipulators) can contribute in a wide variety of applications such 
+as inspection and maintenance, drones in search and rescue, warehouse logistics and collecting data for natural sciences. 
+But to enable full autonomy, the robots need to be able to plan high-level tasks themselves.    
+Such high-level tasks may for instance be moving between locations, handling and lifting objects, or more complex tasks such as searching for an object.  
+This field of research is called automated planning and focuses on how to solve these planning and scheduling problems and how to execute computed plans.
 A classical planning problem consists of an initial state, a desired goal state, and a selection of available actions. 
-For instance, for a simple movable robot, the initial state and goal may be two different locations, while
+For instance, for an unmanned ground vehicle (UGV), the initial state and goal may be two different locations, while
 possible actions may be moving between locations.
-The `paraspace` software solves time-based planning problems, meaning that states and actions have duration in time and the goals 
-may include time deadlines. The software uses a novel algorithm to find a solution advantageous for selected problems. 
+We introduce in this paper a software for automated planning called `paraspace`. 
+The software solves time-based planning problems, meaning that states and actions have duration in time (e.g., the time for an UGV to move between two locations) and the goals 
+may include time deadlines (e.g., the UGV should reach a location before given time). The software uses a novel algorithm to find a solution advantageous for selected problems. 
 The software is both available as a stand-alone software package and as a part of the Unified Planning Framework (UPF) [@upf].
-The purpose of the software is to make its capabilities available not only for AI planning researchers developing the field of planning,
-but also for researchers in need of (task/AI) planning in diverse fields such as autonomous robotics, manufacturing, agriculture, and biology.
+The purpose of publishing this software is to make its capabilities available not only for AI planning researchers developing the field of planning,
+but also for researchers in need of automated planning working with enabling autonoumous techonolgy in an variety of application areas.
   
 # Statement of need
 
